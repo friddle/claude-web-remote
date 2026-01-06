@@ -1,116 +1,113 @@
-# clauded
+# ClauDED
 
-将本地 Claude Code 通过 piko + gotty 转发到远程服务器，实现远程 Web 访问。
+> Expose your local Claude Code through web terminal anywhere using piko + gotty reverse proxy.
 
-## 简介
+## 🌟 Features
 
-clauded 是一个命令行工具，用于将本地的 Claude Code 终端会话通过 gotty 和 piko 服务转发到远程服务器，让你可以通过 Web 浏览器在任何地方访问和使用 Claude Code。
+- 🌐 **Web Terminal Access** - Access Claude Code from any web browser
+- 🔐 **HTTP Basic Auth** - Secure password protection for each session
+- 🔑 **Session Management** - Custom or auto-generated session IDs
+- 🚀 **Easy to Use** - Simple command-line interface
+- 🔒 **Secure Tunneling** - Encrypted connection via piko
+- ⚙️ **Smart Detection** - Automatically detects `claude` or `claude-code` command
+- 🔧 **Flag Passthrough** - Pass custom flags to Claude Code
+- 🌍 **Environment Variables** - Multi-level environment variable configuration
+- 📦 **.env Support** - Auto-load project environment variables
+- 🏗️ **Multi-Architecture** - Support for ARM64 and AMD64 servers
 
-### 核心功能
-
-- 🌐 **Web 终端访问** - 将 Claude Code 暴露为 Web 终端
-- 🔐 **密码认证** - 支持 HTTP Basic 认证保护
-- 🔑 **会话管理** - 自定义或自动生成会话ID
-- 🚀 **简单易用** - 开箱即用的命令行接口
-- 🔒 **安全访问** - 通过 piko 加密隧道连接
-- ⚙️ **智能检测** - 自动检测并使用 `claude` 或 `claude-code` 命令
-- 🔧 **参数透传** - 支持自定义 Claude Code 参数
-- 🌍 **环境变量** - 支持多级环境变量配置
-- 📦 **.env 支持** - 自动加载项目环境变量
-- 🏗️ **多架构** - 支持 ARM64 和 AMD64 服务器
-
-## 系统架构
+## 📋 Architecture
 
 ```
-客户端                      服务器
-┌─────────────┐            ┌─────────────────────┐
-│             │            │                     │
-│  Claude Code│◄────┐     │  Go HTTP Server     │
-│             │     │     │  (端口 8088)        │
-└─────────────┘     │     │                     │
-                    │     │  ↓                  │
-┌─────────────┐     │     │  Piko Proxy         │
-│   clauded   │     └────►│  (端口 8023)        │
-│             │ piko     │                     │
-│  gotty +    │ upstream│  ↓                  │
-│  piko agent │ 8022    │  Piko Upstream       │
-│             │         │  (端口 8022)         │
-└─────────────┘         └─────────────────────┘
+Client Side                              Server Side
+┌─────────────┐                       ┌─────────────────────┐
+│             │                       │                     │
+│  Claude Code│◄────┐                │  Go HTTP Server     │
+│             │     │                │  (Port 8088)        │
+└─────────────┘     │                │                     │
+                    │                │  ↓                  │
+┌─────────────┐     │                │  Piko Proxy         │
+│   clauded   │     └──────────────►│  (Port 8023)        │
+│             │ piko upstream       │                     │
+│  gotty +    │ 8022                │  ↓                  │
+│  piko agent │                     │  Piko Upstream       │
+│             │                     │  (Port 8022)         │
+└─────────────┘                     └─────────────────────┘
 ```
 
-**优势**：
-- ✅ 无需 nginx 配置
-- ✅ Go 原生反向代理
-- ✅ 统一的进程管理
-- ✅ 更小的容器镜像
-- ✅ 更简单的部署
+**Advantages**:
+- ✅ No nginx configuration needed
+- ✅ Native Go reverse proxy
+- ✅ Unified process management
+- ✅ Smaller container image
+- ✅ Simpler deployment
 
-## 安装
+## 📦 Installation
 
-### 客户端安装
+### Client Installation
 
-从源码构建：
+Build from source:
 ```bash
 cd client
 go build -o clauded .
 ```
 
-### 服务端部署
+### Server Deployment
 
-#### 使用 Docker Compose（推荐）
+#### Using Docker Compose (Recommended)
 
-在 `server/docker-compose.yaml` 中已配置好：
+The `server/docker-compose.yaml` comes pre-configured:
 ```yaml
 version: "3.8"
 services:
-  clauded-server:
-    image: friddlecopper/claued-server:latest
-    container_name: clauded-server
+  clauded-port-forward:
+    image: friddlecopper/clauded-port-forward:latest
+    container_name: clauded-port-forward
     environment:
       - PIKO_UPSTREAM_PORT=8022
       - LISTEN_PORT=8088
       - ENABLE_TLS=false
-      # - PIKO_TOKEN=your-token-here  # 可选：添加 token 认证
+      # - PIKO_TOKEN=your-token-here  # Optional: add token authentication
     ports:
-      - "8022:8022"  # piko upstream port (客户端连接)
-      - "8088:8088"  # HTTP access port (浏览器访问)
+      - "8022:8022"  # piko upstream port (client connections)
+      - "8088:8088"  # HTTP access port (browser access)
     restart: unless-stopped
 ```
 
-启动服务：
+Start the server:
 ```bash
 cd server
 docker-compose up -d
 ```
 
-#### 多架构支持
+#### Multi-Architecture Support
 
-- **ARM64** (Apple Silicon): `friddlecopper/claued-server:latest`
-- **AMD64** (Intel/AMD): `friddlecopper/claued-server:amd64`
+- **Default** (AMD64): `friddlecopper/clauded-port-forward:latest`
+- **AMD64** (Intel/AMD): `friddlecopper/clauded-port-forward:amd64`
+- **ARM64** (Apple Silicon): `friddlecopper/clauded-port-forward:arm64`
 
-修改 `docker-compose.yaml` 中的 image 标签即可选择对应架构。
+Change the `image` tag in `docker-compose.yaml` to select the corresponding architecture.
 
-## 使用方法
+## 🚀 Usage
 
-### 基本用法
+### Basic Usage
 
 ```bash
-# 连接到本地服务器（推荐用于测试）
+# Connect to local server (recommended for testing)
 clauded --host=localhost:8022 --session=my-session --password=mypass
 
-# 连接到远程服务器
+# Connect to remote server
 clauded --host=your-server.com:8022 --session=my-session --password=mypass
 
-# 自动生成会话ID和密码
+# Auto-generate session ID and password
 clauded --host=localhost:8022
 
-# 透传 claude 参数
+# Pass flags to claude
 clauded --host=localhost:8022 \
   --session=my-session \
   --password=mypass \
   --flags='--model opus'
 
-# 透传环境变量（最高优先级）
+# Pass environment variables (highest priority)
 clauded --host=localhost:8022 \
   --session=my-session \
   --password=mypass \
@@ -118,186 +115,207 @@ clauded --host=localhost:8022 \
   --env DEBUG=true
 ```
 
-### 环境变量配置
+### Environment Variable Configuration
 
-clauded 支持三级环境变量优先级（从低到高）：
+ClauDED supports three levels of environment variable priority (low to high):
 
-1. **系统环境变量** - 已存在的环境变量
-2. **.env 文件** - 项目目录中的 `.env` 或 `.claude.env`
-3. **命令行参数** - `--env` 参数（最高优先级）
+1. **System Environment Variables** - Existing environment variables
+2. **.env File** - `.env` or `.claude.env` in project directory
+3. **Command-line Arguments** - `--env` parameters (highest priority)
 
-#### 使用 .env 文件
+#### Using .env File
 
-在项目目录创建 `.env` 文件：
+Create a `.env` file in your project directory:
 ```bash
-# .env 文件示例
+# .env file example
 ANTHROPIC_API_KEY=your_api_key_here
 MODEL=opus
 DEBUG=true
 HTTP_PROXY=http://proxy.example.com:8080
 ```
 
-启动 clauded 时会自动加载：
+The .env file is automatically loaded when starting clauded:
 ```bash
-# .env 文件会被自动加载
+# .env file will be auto-loaded
 clauded --host=localhost:8022 --session=my-session --password=mypass
 
-# 命令行参数会覆盖 .env 文件
+# Command-line args override .env file
 clauded --host=localhost:8022 --session=my-session --password=mypass \
-  --env MODEL=sonnet  # 会覆盖 .env 中的 MODEL=opus
+  --env MODEL=sonnet  # This will override MODEL=opus in .env
 ```
 
-### 访问 Web 终端
+### Accessing Web Terminal
 
-启动 clauded 后，在浏览器中访问：
+After starting clauded, access in your browser:
 
 ```
 http://your-server:8088/your-session-id/
 ```
 
-如果设置了密码，浏览器会提示输入认证信息：
-- **用户名**：会话ID（session）
-- **密码**：你设置的密码
+If you set a password, the browser will prompt for authentication:
+- **Username**: Session ID
+- **Password**: Your password
 
-**示例**：
-- 会话ID: `my-session`
-- 密码: `mypass`
-- 访问地址: `http://localhost:8088/my-session/`
-- 认证信息: 用户名=`my-session`, 密码=`mypass`
+**Example**:
+- Session ID: `my-session`
+- Password: `mypass`
+- URL: `http://localhost:8088/my-session/`
+- Auth: Username=`my-session`, Password=`mypass`
 
-### 智能命令检测
+### Smart Command Detection
 
-clauded 会自动检测并使用最佳命令：
+ClauDED automatically detects and uses the best available command:
 
-1. **优先**：系统 PATH 中的 `claude` 命令
-2. **降级**：系统 PATH 中的 `claude-code` 命令
-3. **自动**：`~/.local/bin/claude-code`（自动添加到 PATH）
+1. **Priority**: `claude` command in system PATH
+2. **Fallback**: `claude-code` command in system PATH
+3. **Auto**: `~/.local/bin/claude-code` (auto-added to PATH)
 
-检测过程：
+Detection process:
 ```bash
 🚀 Starting clauded client
 ✓ Using claude command from: /opt/homebrew/bin/claude
 ✅ Services started successfully!
 ```
 
-## 配置说明
+## ⚙️ Configuration
 
-### 服务端环境变量
+### Server Environment Variables
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `PIKO_UPSTREAM_PORT` | 8022 | Piko upstream 监听端口（客户端连接） |
-| `LISTEN_PORT` | 8088 | HTTP 服务监听端口（浏览器访问） |
-| `ENABLE_TLS` | false | 是否启用 TLS |
-| `TLS_CERT_FILE` | - | TLS 证书文件路径 |
-| `TLS_KEY_FILE` | - | TLS 私钥文件路径 |
-| `PIKO_TOKEN` | - | Piko 认证 token（可选） |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PIKO_UPSTREAM_PORT` | 8022 | Piko upstream listen port (for client connections) |
+| `LISTEN_PORT` | 8088 | HTTP service listen port (for browser access) |
+| `ENABLE_TLS` | false | Whether to enable TLS |
+| `TLS_CERT_FILE` | - | TLS certificate file path |
+| `TLS_KEY_FILE` | - | TLS private key file path |
+| `PIKO_TOKEN` | - | Piko authentication token (optional) |
 
-### 客户端参数
+### Client Parameters
 
-| 参数 | 简写 | 默认值 | 说明 |
-|------|------|--------|------|
-| `--host` | `-h` | 必填 | 远程服务器地址（格式：host:port） |
-| `--session` | `-s` | 自动生成 | 会话ID |
-| `--password` | `-p` | 空 | 认证密码 |
-| `--flags` | `-f` | 空 | 透传给 claude 的参数 |
-| `--env` | `-e` | 空 | 环境变量（可多次使用） |
-| `--auto-exit` | - | true | 24小时后自动退出 |
-| `--insecure-skip-verify` | - | false | 跳过 TLS 证书验证 |
-| `--skip-install-check` | - | false | 跳过 claude 安装检查 |
+| Parameter | Short | Default | Description |
+|----------|-------|---------|-------------|
+| `--host` | `-h` | **Required** | Remote server address (format: host:port) |
+| `--session` | `-s` | Auto-generated | Session ID |
+| `--password` | `-p` | Empty | Authentication password |
+| `--flags` | `-f` | Empty | Flags to pass to claude |
+| `--env` | `-e` | Empty | Environment variables (can be used multiple times) |
+| `--auto-exit` | - | true | Auto exit after 24 hours |
+| `--insecure-skip-verify` | - | false | Skip TLS certificate verification |
+| `--skip-install-check` | - | false | Skip claude installation check |
 
-## 常见问题
+## 🔍 Port Explanation
 
-### 1. 端口说明
+- **8022**: Piko upstream port - used by client to connect
+- **8023**: Piko proxy port - internal use (inside container)
+- **8088**: HTTP service port - used by browser to access
 
-- **8022**: Piko upstream 端口，客户端连接使用
-- **8023**: Piko proxy 端口，内部使用（容器内部）
-- **8088**: HTTP 服务端口，浏览器访问使用
+## ❓ FAQ
 
-### 2. 连接失败
+### Connection Failed
 
-确保服务器防火墙开放以下端口：
-- 客户端需要访问：`8022` 端口
-- 浏览器需要访问：`8088` 端口
+Make sure your server firewall allows the following ports:
+- Client needs access to: `8022` port
+- Browser needs access to: `8088` port
 
-### 3. claude 命令未找到
+### claude Command Not Found
 
-clauded 会自动检测以下位置：
+ClauDED automatically checks the following locations:
 - `/opt/homebrew/bin/claude` (Homebrew)
 - `/usr/local/bin/claude`
 - `~/.local/bin/claude-code`
 
-如果仍未找到，请确保 claude 已正确安装。
+If still not found, please ensure claude is properly installed.
 
-### 4. 多会话支持
+### Multiple Sessions Support
 
-可以同时运行多个 clauded 实例，每个实例使用不同的 session ID：
+You can run multiple clauded instances simultaneously, each with a different session ID:
 ```bash
-# 终端 1
+# Terminal 1
 clauded --host=localhost:8022 --session=session1 --password=pass1
 
-# 终端 2
+# Terminal 2
 clauded --host=localhost:8022 --session=session2 --password=pass2
 
-# 终端 3
+# Terminal 3
 clauded --host=localhost:8022 --session=session3 --password=pass3
 ```
 
-## 开发
+## 🛠️ Development
 
-### 构建客户端
+### Build Client
 
 ```bash
 cd client
 go build -o clauded .
 ```
 
-### 构建服务端 Docker 镜像
+### Build Server Docker Image
 
 ```bash
 cd server
 
-# ARM64 (Apple Silicon)
-docker build --platform linux/arm64 -t friddlecopper/claued-server:latest .
+# AMD64 (Intel/AMD) - default
+docker build --platform linux/amd64 -t friddlecopper/clauded-port-forward:latest .
 
-# AMD64 (Intel/AMD)
-docker build --platform linux/amd64 -t friddlecopper/claued-server:amd64 .
+# ARM64 (Apple Silicon)
+docker build --platform linux/arm64 -t friddlecopper/clauded-port-forward:arm64 .
 ```
 
-### 项目结构
+### Project Structure
 
 ```
 clauded/
-├── client/                 # 客户端代码
-│   ├── main.go            # 入口文件
+├── client/                 # Client code
+│   ├── main.go            # Entry point
 │   ├── src/
-│   │   ├── config.go      # 配置管理
-│   │   ├── service.go     # 服务管理（gotty + piko）
-│   │   ├── installer.go   # 安装检测
-│   │   └── .env           # 环境变量配置
-│   └── clauded            # 编译后的可执行文件
-├── server/                # 服务端代码
-│   ├── cmd/server/        # 服务器入口
-│   ├── config/            # 配置管理
-│   ├── handlers/          # HTTP 处理器
-│   ├── proxy/             # 反向代理
-│   ├── notification/      # 通知服务
-│   ├── session/           # 会话管理
-│   ├── Dockerfile         # Docker 镜像构建
-│   └── docker-compose.yaml # Docker Compose 配置
-└── README.md              # 项目文档
+│   │   ├── config.go      # Configuration management
+│   │   ├── service.go     # Service management (gotty + piko)
+│   │   ├── installer.go   # Installation detection
+│   │   └── .env           # Environment variables config
+│   └── clauded            # Compiled binary
+├── server/                # Server code
+│   ├── cmd/server/        # Server entry point
+│   ├── config/            # Configuration
+│   ├── handlers/          # HTTP handlers
+│   ├── proxy/             # Reverse proxy
+│   ├── notification/      # Notification service
+│   ├── session/           # Session management
+│   ├── Dockerfile         # Docker image build
+│   └── docker-compose.yaml # Docker Compose config
+└── README.md              # Project documentation
 ```
 
-## 贡献
+## 🤝 Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-## 许可证
+## 📄 License
 
-[待添加许可证信息]
+MIT License
 
-## 相关链接
+Copyright (c) 2025 ClauDED
 
-- [Claude Code 官方文档](https://claude.com/claude-code)
-- [gotty 项目](https://github.com/yudai/gotty)
-- [piko 项目](https://github.com/andydunstall/piko)
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## 🔗 Related Links
+
+- [Claude Code Official Documentation](https://claude.com/claude-code)
+- [gotty Project](https://github.com/yudai/gotty)
+- [piko Project](https://github.com/andydunstall/piko)
+

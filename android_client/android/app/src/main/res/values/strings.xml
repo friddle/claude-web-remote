@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">ClaudedAndroid</string>
-    <string name="title_activity_main">ClaudedAndroid</string>
-    <string name="package_name">com.friddle.clauded</string>
-    <string name="custom_url_scheme">com.friddle.clauded</string>
-</resources>

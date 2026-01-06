@@ -1,0 +1,24 @@
+# Android
+android/.gradle/
+android/app/build/
+android/app/release/
+android/local.properties
+android/captures/
+android/.externalNativeBuild
+android/.idea/
+
+# iOS
+ios/App/Pods/
+ios/App/App.xcworkspace/
+ios/App/Podfile.lock
+ios/App/.symlinks/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/*.ipa
+ios/App/*.dSYM.zip
+ios/App/*.dSYM
+
+# General
+*.log
+.DS_Store
+node_modules/

@@ -1,0 +1,7 @@
+/build/*
+!/build/.npmkeep
+
+# Signing configuration and keystore (DO NOT COMMIT)
+signing-config.properties
+*.keystore
+*.jks
