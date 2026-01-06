@@ -64,11 +64,17 @@ func (m *Manager) ProxyRequest() http.HandlerFunc {
 				}
 			},
 			ModifyResponse: func(resp *http.Response) error {
-				// Handle CORS if needed
+				// If Piko returns 502, it means the upstream (client) is not connected.
+				// We map this to 404 to indicate "Session Not Found".
+				if resp.StatusCode == http.StatusBadGateway {
+					resp.StatusCode = http.StatusNotFound
+				}
 				return nil
 			},
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 				log.Printf("Proxy error: %v", err)
+				// If we can't connect to Piko proxy (localhost), that's a 502.
+				// If Piko returns 502 (handled in ModifyResponse), it's a 404.
 				http.Error(w, "Proxy error", http.StatusBadGateway)
 			},
 		}
