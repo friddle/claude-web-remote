@@ -22,12 +22,26 @@ build-go:
 	go build -o dist/clauded-port-forward ./cmd/server
 	@echo "Go binary built: dist/clauded-port-forward"
 
-# Build Docker image
+# Build Docker image (Native)
 .PHONY: build
 build:
-	@echo "Building ${IMAGE_NAME} Docker image..."
+	@echo "Building ${IMAGE_NAME} Docker image (Native)..."
 	docker build -t ${IMAGE_NAME}:${DOCKER_TAG} .
 	@echo "Docker image built: ${IMAGE_NAME}:${DOCKER_TAG}"
+
+# Build Docker image (AMD64/x86)
+.PHONY: build-amd64
+build-amd64:
+	@echo "Building ${IMAGE_NAME} Docker image (linux/amd64)..."
+	docker build --platform linux/amd64 -t ${IMAGE_NAME}:${DOCKER_TAG} .
+	@echo "Docker image built: ${IMAGE_NAME}:${DOCKER_TAG} (amd64)"
+
+# Build Docker image (ARM64)
+.PHONY: build-arm64
+build-arm64:
+	@echo "Building ${IMAGE_NAME} Docker image (linux/arm64)..."
+	docker build --platform linux/arm64 -t ${IMAGE_NAME}:arm64 .
+	@echo "Docker image built: ${IMAGE_NAME}:arm64"
 
 # Build and push Docker image
 .PHONY: push
@@ -35,6 +49,13 @@ push: build
 	@echo "Pushing Docker image to registry..."
 	docker push ${IMAGE_NAME}:${DOCKER_TAG}
 	@echo "Image pushed: ${IMAGE_NAME}:${DOCKER_TAG}"
+
+# Push AMD64 specifically
+.PHONY: push-amd64
+push-amd64: build-amd64
+	@echo "Pushing ${IMAGE_NAME}:${DOCKER_TAG} (amd64)..."
+	docker push ${IMAGE_NAME}:${DOCKER_TAG}
+	@echo "Image pushed"
 
 # Build with version tag
 .PHONY: build-version

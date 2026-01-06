@@ -46,6 +46,15 @@ temp/
 # Build artifacts
 /dist/
 /build/
+/target/
+/output/
+
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
 # Docker volumes
 docker-volumes/
