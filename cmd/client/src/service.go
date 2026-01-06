@@ -59,6 +59,14 @@ func (sm *ServiceManager) Start() error {
 	sm.config.GottyPort = sm.config.FindAvailablePort()
 	fmt.Printf("Local listening port: %d\n", sm.config.GottyPort)
 
+	// If daemon mode, fork to background before starting services
+	if sm.config.Daemon {
+		if err := sm.daemonize(); err != nil {
+			return fmt.Errorf("failed to daemonize: %w", err)
+		}
+		return nil
+	}
+
 	// Use oklog/run to start services
 	return sm.startServices()
 }
@@ -446,4 +454,68 @@ func (sm *ServiceManager) parseEnvFile(filename string) {
 			}
 		}
 	}
+}
+
+// daemonize forks the process to background and starts services
+func (sm *ServiceManager) daemonize() error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("daemon mode is not supported on Windows, use a service manager instead")
+	}
+
+	// Get the path to save the PID file
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	pidFile := filepath.Join(homeDir, ".clauded.pid")
+
+	// Get the current executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Build arguments without the daemon flag
+	args := []string{}
+	for _, arg := range os.Args[1:] {
+		if arg != "-d" && arg != "--daemon" && !strings.HasPrefix(arg, "--daemon=") {
+			args = append(args, arg)
+		}
+	}
+
+	// Create a new process that will run in background
+	// Set stdin to os.DevNull, and close stdout/stderr
+	cmd := exec.Command(execPath, args...)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	// Set process to be detached from terminal
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
+	}
+
+	// Start the process
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start daemon process: %w", err)
+	}
+
+	// Save PID to file
+	pid := cmd.Process.Pid
+	if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", pid)), 0644); err != nil {
+		fmt.Printf("Warning: failed to write PID file: %v\n", err)
+	}
+
+	// Print completion message
+	fmt.Printf("✅ Service started in background (daemon mode)\n")
+	fmt.Printf("   Process ID: %d\n", pid)
+	fmt.Printf("   PID file: %s\n", pidFile)
+	fmt.Printf("🌐 Access URL: http://localhost:%d\n", sm.config.GottyPort)
+	if sm.config.Password != "" {
+		fmt.Printf("🔐 HTTP auth: username=%s, password=%s\n", sm.config.GetSessionID(), sm.config.Password)
+	}
+	fmt.Printf("Session: %s\n", sm.config.GetSessionID())
+	fmt.Printf("To stop: kill %d\n", pid)
+
+	return nil
 }

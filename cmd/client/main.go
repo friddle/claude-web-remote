@@ -29,6 +29,7 @@ func MakeMainCmd() *cobra.Command {
 		autoExit           bool
 		insecureSkipVerify bool
 		skipInstall        bool
+		daemon             bool
 	)
 
 	cmd := &cobra.Command{
@@ -72,6 +73,7 @@ Examples:
 				EnvVars:            envVars,
 				AutoExit:           autoExit,
 				InsecureSkipVerify: insecureSkipVerify,
+				Daemon:             daemon,
 			}
 
 			// Validate configuration
@@ -117,6 +119,7 @@ Examples:
 	cmd.Flags().BoolVar(&autoExit, "auto-exit", true, "Enable 24-hour auto exit (default: true)")
 	cmd.Flags().BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "Skip HTTPS certificate verification (default: false)")
 	cmd.Flags().BoolVar(&skipInstall, "skip-install-check", false, "Skip claude-code installation check (default: false)")
+	cmd.Flags().BoolVarP(&daemon, "daemon", "d", false, "Run as daemon in background (default: false)")
 
 	return cmd
 }

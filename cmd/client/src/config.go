@@ -1,12 +1,13 @@
 package src
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -24,6 +25,7 @@ type Config struct {
 	GottyPort          int      // local gotty port (auto allocated)
 	AutoExit           bool     // enable 24-hour auto exit (default: true)
 	InsecureSkipVerify bool     // skip HTTPS certificate verification (default: false)
+	Daemon             bool     // run as daemon (background mode)
 }
 
 // NewConfig creates a new configuration instance
@@ -40,6 +42,7 @@ func NewConfig() *Config {
 		GottyPort:          0,                                         // will be auto allocated on startup
 		AutoExit:           getEnvBoolOrDefault("AUTO_EXIT", true),    // read auto exit setting from env, default true
 		InsecureSkipVerify: getEnvBoolOrDefault("INSECURE_SKIP_VERIFY", false), // read skip cert verify from env, default false
+		Daemon:             getEnvBoolOrDefault("DAEMON", false),      // read daemon mode from env, default false
 	}
 }
 
@@ -181,10 +184,10 @@ func generateShortPassword() string {
 	return string(b)
 }
 
-// randInt generates a random integer
+// randInt generates a random integer using crypto/rand
 func randInt() int {
-	// Simple random number generator using time
-	return int(time.Now().UnixNano()%1000000007)
+	n, _ := rand.Int(rand.Reader, big.NewInt(1000000007))
+	return int(n.Int64())
 }
 
 // getEnvOrDefault gets environment variable or default value
