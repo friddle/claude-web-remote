@@ -134,6 +134,13 @@ install_claude_code() {
 
     log_warn "claude-code is not installed, starting installation..."
 
+    # Configure npm to use user directory if not root
+    if [ "$EUID" -ne 0 ]; then
+        log_info "Not running as root, setting npm prefix to user directory..."
+        npm config set prefix "$HOME/.local"
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+
     # Configure npm mirror if enabled
     if [ "$use_mirror" = "true" ]; then
         configure_npm_mirror
