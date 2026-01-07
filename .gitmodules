@@ -1,0 +1,3 @@
+[submodule "cmd/client/gotty"]
+	path = cmd/client/gotty
+	url = https://github.com/friddle/gotty

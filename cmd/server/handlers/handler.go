@@ -44,6 +44,7 @@ func (h *Handler) SetupRoutes() *gin.Engine {
 	api := router.Group("/api/v1/notifications")
 	{
 		api.POST("/subscribe", h.SubscribeWebhook)
+		api.POST("/publish", h.PublishNotification)
 		api.DELETE("/unsubscribe", h.UnsubscribeWebhook)
 		api.GET("/subscriptions", h.GetSubscriptions)
 	}
@@ -140,6 +141,31 @@ func (h *Handler) SubscribeWebhook(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Webhook subscribed successfully",
+	})
+}
+
+type PublishRequest struct {
+	SessionID string                 `json:"session_id" binding:"required"`
+	Type      string                 `json:"type" binding:"required"`
+	Data      map[string]interface{} `json:"data"`
+}
+
+func (h *Handler) PublishNotification(c *gin.Context) {
+	var req PublishRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Publish notification to the service
+	h.notificationSvc.Publish(req.SessionID, notification.NotificationType(req.Type), req.Data)
+
+	log.Printf("Notification published: session=%s, type=%s", req.SessionID, req.Type)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "published",
+		"session": req.SessionID,
+		"type":    req.Type,
 	})
 }
 

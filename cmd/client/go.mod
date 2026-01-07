@@ -10,6 +10,8 @@ require (
 	github.com/spf13/cobra v1.8.1
 )
 
+replace github.com/sorenisanerd/gotty => ./gotty
+
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/andydunstall/yamux v0.1.5 // indirect

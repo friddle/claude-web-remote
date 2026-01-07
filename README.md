@@ -1,321 +1,215 @@
 # ClauDED
 
-> Expose your local Claude Code through web terminal anywhere using piko + gotty reverse proxy.
+> Expose your local Claude Code through web terminal anywhere - perfect for remote access and mobile devices.
 
-## 🌟 Features
+## Use Cases
 
-- 🌐 **Web Terminal Access** - Access Claude Code from any web browser
-- 🔐 **HTTP Basic Auth** - Secure password protection for each session
-- 🔑 **Session Management** - Custom or auto-generated session IDs
-- 🚀 **Easy to Use** - Simple command-line interface
-- 🔒 **Secure Tunneling** - Encrypted connection via piko
-- ⚙️ **Smart Detection** - Automatically detects `claude` or `claude-code` command
-- 🔧 **Flag Passthrough** - Pass custom flags to Claude Code
-- 🌍 **Environment Variables** - Multi-level environment variable configuration
-- 📦 **.env Support** - Auto-load project environment variables
-- 🏗️ **Multi-Architecture** - Support for ARM64 and AMD64 servers
+**🌍 Remote Access**
+- Access your Claude Code from anywhere in the world
+- Work on your projects while traveling
+- No need to expose your local machine directly
 
-## 📋 Architecture
+**📱 Mobile Devices**
+- Use Claude Code on your phone or tablet
+- Perfect for quick code reviews and responses
+- Full terminal experience in mobile browser
 
-```
-Client Side                              Server Side
-┌─────────────┐                       ┌─────────────────────┐
-│             │                       │                     │
-│  Claude Code│◄────┐                │  Go HTTP Server     │
-│             │     │                │  (Port 8088)        │
-└─────────────┘     │                │                     │
-                    │                │  ↓                  │
-┌─────────────┐     │                │  Piko Proxy         │
-│   clauded   │     └──────────────►│  (Port 8023)        │
-│             │ piko upstream       │                     │
-│  gotty +    │ 8022                │  ↓                  │
-│  piko agent │                     │  Piko Upstream       │
-│             │                     │  (Port 8022)         │
-└─────────────┘                     └─────────────────────┘
-```
+## Quick Start
 
-**Advantages**:
-- ✅ No nginx configuration needed
-- ✅ Native Go reverse proxy
-- ✅ Unified process management
-- ✅ Smaller container image
-- ✅ Simpler deployment
+### 1. Deploy Server (one-time setup)
 
-## 📦 Installation
+Start the server on your remote machine:
 
-### Client Installation
-
-Build from source:
-```bash
-cd client
-go build -o clauded .
-```
-
-### Server Deployment
-
-#### Using Docker Compose (Recommended)
-
-The `server/docker-compose.yaml` comes pre-configured:
-```yaml
-version: "3.8"
-services:
-  clauded-port-forward:
-    image: friddlecopper/clauded-port-forward:latest
-    container_name: clauded-port-forward
-    environment:
-      - PIKO_UPSTREAM_PORT=8022
-      - LISTEN_PORT=8088
-      - ENABLE_TLS=false
-      # - PIKO_TOKEN=your-token-here  # Optional: add token authentication
-    ports:
-      - "8022:8022"  # piko upstream port (client connections)
-      - "8088:8088"  # HTTP access port (browser access)
-    restart: unless-stopped
-```
-
-Start the server:
 ```bash
 cd server
 docker-compose up -d
 ```
 
-#### Multi-Architecture Support
+The server will expose two ports:
+- `8022` - for client connections
+- `8088` - for browser access
 
-- **Default** (AMD64): `friddlecopper/clauded-port-forward:latest`
-- **AMD64** (Intel/AMD): `friddlecopper/clauded-port-forward:amd64`
-- **ARM64** (Apple Silicon): `friddlecopper/clauded-port-forward:arm64`
-
-Change the `image` tag in `docker-compose.yaml` to select the corresponding architecture.
-
-## 🚀 Usage
-
-### Basic Usage
+### 2. Connect from Your Local Machine
 
 ```bash
-# Connect to local server (recommended for testing)
+# Local testing
 clauded --host=localhost:8022 --session=my-session --password=mypass
 
-# Connect to remote server
+# Remote server
 clauded --host=your-server.com:8022 --session=my-session --password=mypass
+```
 
-# Auto-generate session ID and password
-clauded --host=localhost:8022
+### 3. Access in Browser
 
-# Pass flags to claude
-clauded --host=localhost:8022 \
+Open your browser and navigate to:
+
+```
+http://your-server:8088/my-session/
+```
+
+When prompted:
+- **Username**: `my-session`
+- **Password**: `mypass`
+
+## Usage Examples
+
+### Basic Remote Access
+
+```bash
+# Connect to your server
+clauded --host=myserver.com:8022 --session=work --password=secure123
+
+# Now access from any browser:
+# http://myserver.com:8088/work/
+```
+
+### Mobile Device Setup
+
+```bash
+# Start session on your local machine
+clauded --host=myserver.com:8022 --session=mobile --password=pass123
+
+# Open on your phone:
+# http://myserver.com:8088/mobile/
+# Login with username: mobile, password: pass123
+```
+
+### Auto-generated Credentials
+
+```bash
+# Let clauded generate session ID and password
+clauded --host=myserver.com:8022
+
+# Output will show:
+# ✓ Session ID: abc123
+# ✓ Password: xyz789
+# URL: http://myserver.com:8088/abc123/
+```
+
+### Pass Flags to Claude
+
+```bash
+clauded --host=myserver.com:8022 \
   --session=my-session \
   --password=mypass \
   --flags='--model opus'
-
-# Pass environment variables (highest priority)
-clauded --host=localhost:8022 \
-  --session=my-session \
-  --password=mypass \
-  --env API_KEY=xxx \
-  --env DEBUG=true
 ```
 
-### Environment Variable Configuration
+### Use Different AI Tools
 
-ClauDED supports three levels of environment variable priority (low to high):
-
-1. **System Environment Variables** - Existing environment variables
-2. **.env File** - `.env` or `.claude.env` in project directory
-3. **Command-line Arguments** - `--env` parameters (highest priority)
-
-#### Using .env File
-
-Create a `.env` file in your project directory:
 ```bash
-# .env file example
-ANTHROPIC_API_KEY=your_api_key_here
+# Use Claude (default)
+clauded --host=myserver.com:8022 --session=my-session --password=mypass
+
+# Use OpenCode
+clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=opencode
+
+# Use Kimi
+clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=kimi
+
+# Use Gemini
+clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=gemini
+```
+
+### Environment Variables
+
+Create a `.env` file in your project:
+
+```bash
+ANTHROPIC_API_KEY=your_key_here
 MODEL=opus
 DEBUG=true
-HTTP_PROXY=http://proxy.example.com:8080
 ```
 
-The .env file is automatically loaded when starting clauded:
-```bash
-# .env file will be auto-loaded
-clauded --host=localhost:8022 --session=my-session --password=mypass
-
-# Command-line args override .env file
-clauded --host=localhost:8022 --session=my-session --password=mypass \
-  --env MODEL=sonnet  # This will override MODEL=opus in .env
-```
-
-### Accessing Web Terminal
-
-After starting clauded, access in your browser:
-
-```
-http://your-server:8088/your-session-id/
-```
-
-If you set a password, the browser will prompt for authentication:
-- **Username**: Session ID
-- **Password**: Your password
-
-**Example**:
-- Session ID: `my-session`
-- Password: `mypass`
-- URL: `http://localhost:8088/my-session/`
-- Auth: Username=`my-session`, Password=`mypass`
-
-### Smart Command Detection
-
-ClauDED automatically detects and uses the best available command:
-
-1. **Priority**: `claude` command in system PATH
-2. **Fallback**: `claude-code` command in system PATH
-3. **Auto**: `~/.local/bin/claude-code` (auto-added to PATH)
-
-Detection process:
-```bash
-🚀 Starting clauded client
-✓ Using claude command from: /opt/homebrew/bin/claude
-✅ Services started successfully!
-```
-
-## ⚙️ Configuration
-
-### Server Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PIKO_UPSTREAM_PORT` | 8022 | Piko upstream listen port (for client connections) |
-| `LISTEN_PORT` | 8088 | HTTP service listen port (for browser access) |
-| `ENABLE_TLS` | false | Whether to enable TLS |
-| `TLS_CERT_FILE` | - | TLS certificate file path |
-| `TLS_KEY_FILE` | - | TLS private key file path |
-| `PIKO_TOKEN` | - | Piko authentication token (optional) |
-
-### Client Parameters
-
-| Parameter | Short | Default | Description |
-|----------|-------|---------|-------------|
-| `--host` | `-h` | **Required** | Remote server address (format: host:port) |
-| `--session` | `-s` | Auto-generated | Session ID |
-| `--password` | `-p` | Empty | Authentication password |
-| `--flags` | `-f` | Empty | Flags to pass to claude |
-| `--env` | `-e` | Empty | Environment variables (can be used multiple times) |
-| `--auto-exit` | - | true | Auto exit after 24 hours |
-| `--insecure-skip-verify` | - | false | Skip TLS certificate verification |
-| `--skip-install-check` | - | false | Skip claude installation check |
-
-## 🔍 Port Explanation
-
-- **8022**: Piko upstream port - used by client to connect
-- **8023**: Piko proxy port - internal use (inside container)
-- **8088**: HTTP service port - used by browser to access
-
-## ❓ FAQ
-
-### Connection Failed
-
-Make sure your server firewall allows the following ports:
-- Client needs access to: `8022` port
-- Browser needs access to: `8088` port
-
-### claude Command Not Found
-
-ClauDED automatically checks the following locations:
-- `/opt/homebrew/bin/claude` (Homebrew)
-- `/usr/local/bin/claude`
-- `~/.local/bin/claude-code`
-
-If still not found, please ensure claude is properly installed.
-
-### Multiple Sessions Support
-
-You can run multiple clauded instances simultaneously, each with a different session ID:
-```bash
-# Terminal 1
-clauded --host=localhost:8022 --session=session1 --password=pass1
-
-# Terminal 2
-clauded --host=localhost:8022 --session=session2 --password=pass2
-
-# Terminal 3
-clauded --host=localhost:8022 --session=session3 --password=pass3
-```
-
-## 🛠️ Development
-
-### Build Client
+The `.env` file is auto-loaded when you start clauded:
 
 ```bash
-cd client
+clauded --host=myserver.com:8022 --session=my-session --password=mypass
+```
+
+Override with command-line args:
+
+```bash
+clauded --host=myserver.com:8022 --session=my-session \
+  --password=mypass --env MODEL=sonnet
+```
+
+## Installation
+
+### Client (Your Local Machine)
+
+Build from source:
+
+```bash
+cd cmd/client
 go build -o clauded .
 ```
 
-### Build Server Docker Image
+### Server (Remote Machine)
+
+Use Docker Compose:
 
 ```bash
 cd server
-
-# AMD64 (Intel/AMD) - default
-docker build --platform linux/amd64 -t friddlecopper/clauded-port-forward:latest .
-
-# ARM64 (Apple Silicon)
-docker build --platform linux/arm64 -t friddlecopper/clauded-port-forward:arm64 .
+docker-compose up -d
 ```
 
-### Project Structure
+## Client Parameters
+
+| Parameter | Short | Default | Description |
+|----------|-------|---------|-------------|
+| `--host` | `-h` | **Required** | Server address (host:port) |
+| `--session` | `-s` | Auto-generated | Session ID for URL and auth |
+| `--password` | `-p` | Empty | Password for authentication |
+| `--codecmd` | - | claude | AI tool to use (claude, opencode, kimi, gemini) |
+| `--flags` | `-f` | Empty | Flags to pass to codecmd |
+| `--env` | `-e` | Empty | Environment variables (repeatable) |
+
+## Multiple Sessions
+
+Run multiple sessions simultaneously:
+
+```bash
+# Terminal 1 - for work
+clauded --host=localhost:8022 --session=work --password=workpass
+
+# Terminal 2 - for testing
+clauded --host=localhost:8022 --session=test --password=testpass
+
+# Terminal 3 - for mobile
+clauded --host=localhost:8022 --session=mobile --password=mobilepass
+```
+
+## Troubleshooting
+
+### Connection Failed
+
+Ensure firewall allows:
+- Port `8022` - client to server
+- Port `8088` - browser to server
+
+### Claude Command Not Found
+
+ClauDED automatically finds:
+- `claude` in system PATH
+- `claude-code` in system PATH
+- `~/.local/bin/claude-code`
+
+If not found, install Claude Code first.
+
+## How It Works
 
 ```
-clauded/
-├── client/                 # Client code
-│   ├── main.go            # Entry point
-│   ├── src/
-│   │   ├── config.go      # Configuration management
-│   │   ├── service.go     # Service management (gotty + piko)
-│   │   ├── installer.go   # Installation detection
-│   │   └── .env           # Environment variables config
-│   └── clauded            # Compiled binary
-├── server/                # Server code
-│   ├── cmd/server/        # Server entry point
-│   ├── config/            # Configuration
-│   ├── handlers/          # HTTP handlers
-│   ├── proxy/             # Reverse proxy
-│   ├── notification/      # Notification service
-│   ├── session/           # Session management
-│   ├── Dockerfile         # Docker image build
-│   └── docker-compose.yaml # Docker Compose config
-└── README.md              # Project documentation
+Your Local Machine           Remote Server              Browser (Any Device)
+┌─────────────┐            ┌──────────────┐           ┌─────────────┐
+│  Claude Code│            │              │           │             │
+│             │            │  Go Server   │◄──────────│  Web Browser│
+│  clauded    │───────────►│  :8088       │           │             │
+│  (gotty+    │  piko      │              │           │             │
+│   piko)     │  :8022     │  Piko Proxy  │           │             │
+└─────────────┘            └──────────────┘           └─────────────┘
 ```
 
-## 🤝 Contributing
+## License
 
-Issues and Pull Requests are welcome!
-
-## 📄 License
-
-MIT License
-
-Copyright (c) 2025 ClauDED
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-## 🔗 Related Links
-
-- [Claude Code Official Documentation](https://claude.com/claude-code)
-- [gotty Project](https://github.com/yudai/gotty)
-- [piko Project](https://github.com/andydunstall/piko)
-
+MIT

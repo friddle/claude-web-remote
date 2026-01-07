@@ -1,27 +1,21 @@
 package src
 
 import (
-	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/andydunstall/piko/agent/config"
-	"github.com/andydunstall/piko/agent/reverseproxy"
-	"github.com/andydunstall/piko/client"
-	"github.com/andydunstall/piko/pkg/log"
 	"github.com/oklog/run"
-	"github.com/sorenisanerd/gotty/backend/localcommand"
-	"github.com/sorenisanerd/gotty/server"
+
+	"clauded-client/src/commands"
+	"clauded-client/src/environment"
+	"clauded-client/src/platform"
+	"clauded-client/src/services"
 )
 
 // ServiceManager service manager
@@ -44,6 +38,7 @@ func NewServiceManager(config *Config) *ServiceManager {
 // Start starts all services
 func (sm *ServiceManager) Start() error {
 	fmt.Printf("🚀 Starting clauded client\n")
+	fmt.Printf("Code command: %s\n", sm.config.CodeCmd)
 	fmt.Printf("Session ID: %s\n", sm.config.GetSessionID())
 	fmt.Printf("Remote server: %s\n", sm.config.Remote)
 	fmt.Printf("Auto exit: %t\n", sm.config.AutoExit)
@@ -75,9 +70,25 @@ func (sm *ServiceManager) Start() error {
 func (sm *ServiceManager) startServices() error {
 	var g run.Group
 
+	// Get the command to run
+	command, args := sm.getClaudeCodeCommand()
+
+	// Load environment variables
+	envLoader := environment.NewLoader(sm.config.EnvVars)
+	envLoader.Load()
+
 	// Start piko service
 	g.Add(func() error {
-		err := sm.startPiko()
+		pikoConfig := services.PikoConfig{
+			RemoteURL:   sm.config.GetPikoAddress(),
+			EndpointID:  sm.config.GetSessionID(),
+			LocalAddr:   fmt.Sprintf("127.0.0.1:%d", sm.config.GottyPort),
+			Timeout:     30 * time.Second,
+			GracePeriod: 30 * time.Second,
+			AccessLog:   false,
+		}
+		pikoService := services.NewPikoService(pikoConfig, sm.ctx, sm.config.InsecureSkipVerify)
+		err := pikoService.Start()
 		if err != nil {
 			fmt.Printf("Failed to start piko: %v\n", err)
 			return err
@@ -91,7 +102,21 @@ func (sm *ServiceManager) startServices() error {
 
 	// Start gotty service
 	g.Add(func() error {
-		err := sm.startGotty()
+		sessionID := sm.config.GetSessionID()
+		gottyConfig := services.GottyConfig{
+			Address:         "127.0.0.1",
+			Port:            sm.config.GottyPort,
+			Path:            "/" + sessionID,
+			PermitWrite:     true,
+			TitleFormat:     sm.config.CodeCmd + " - " + sessionID,
+			WSOrigin:        ".*",
+			EnableBasicAuth: sm.config.Password != "",
+			Credential:      sessionID + ":" + sm.config.Password,
+			Command:         command,
+			Args:            args,
+		}
+		gottyService := services.NewGottyService(gottyConfig, sm.ctx)
+		err := gottyService.Start()
 		if err != nil {
 			fmt.Printf("Failed to start gotty: %v\n", err)
 			return err
@@ -105,25 +130,7 @@ func (sm *ServiceManager) startServices() error {
 
 	// Signal handling
 	g.Add(func() error {
-		c := make(chan os.Signal, 1)
-
-		// Set different signals based on operating system
-		if runtime.GOOS == "windows" {
-			// Windows supports Ctrl+C (SIGINT) and Ctrl+Break
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		} else {
-			// Unix-like systems support more signals
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		}
-
-		select {
-		case sig := <-c:
-			fmt.Printf("\n🛑 Received stop signal %v, shutting down services...\n", sig)
-			sm.cancel() // Cancel context immediately
-			return nil
-		case <-sm.ctx.Done():
-			return sm.ctx.Err()
-		}
+		return sm.handleSignals()
 	}, func(error) {
 		sm.cancel()
 	})
@@ -131,12 +138,13 @@ func (sm *ServiceManager) startServices() error {
 	// 24-hour timeout - only enable when AutoExit is true
 	if sm.config.AutoExit {
 		g.Add(func() error {
-			timeoutCtx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+			timeoutHours := platform.AutoExitTimeoutHours
+			timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutHours)*time.Hour)
 			defer cancel()
 
 			select {
 			case <-timeoutCtx.Done():
-				fmt.Printf("\n⏰ Service has been running for 24 hours, stopping...\n")
+				fmt.Printf("\n⏰ Service has been running for %d hours, stopping...\n", timeoutHours)
 				sm.cancel()
 				return nil
 			case <-sm.ctx.Done():
@@ -148,6 +156,20 @@ func (sm *ServiceManager) startServices() error {
 	}
 
 	sessionID := sm.config.GetSessionID()
+
+	// Save session info
+	info := &SessionInfo{
+		SessionID: sessionID,
+		PID:       os.Getpid(),
+		Port:      sm.config.GottyPort,
+		StartTime: time.Now(),
+		Config:    sm.config,
+	}
+	if err := saveSessionInfo(info); err != nil {
+		fmt.Printf("Warning: failed to save session info: %v\n", err)
+	}
+	defer removeSessionInfo(sessionID)
+
 	fmt.Printf("✅ Services started successfully!\n")
 	fmt.Printf("🌐 Access URL: http://localhost:%d\n", sm.config.GottyPort)
 	if sm.config.Password != "" {
@@ -161,9 +183,28 @@ func (sm *ServiceManager) startServices() error {
 	return g.Run()
 }
 
-// Wait waits for services to run (deprecated, use Start method)
-func (sm *ServiceManager) Wait() {
-	fmt.Printf("⚠️  Wait method is deprecated, please use Start method\n")
+// handleSignals handles OS signals for graceful shutdown
+func (sm *ServiceManager) handleSignals() error {
+	c := make(chan os.Signal, 1)
+
+	// Set different signals based on operating system
+	signals := platform.GetStopSignals()
+	signal.Notify(c, signals...)
+
+	select {
+	case sig := <-c:
+		fmt.Printf("\n🛑 Received stop signal %v, shutting down services...\n", sig)
+
+		// Kill tmux session if it exists
+		CleanupTmuxSession(sm.config.GetSessionID())
+
+		sm.cancel() // Cancel context immediately
+		return nil
+	case <-sm.ctx.Done():
+		// Context cancelled elsewhere (e.g. timeout), also cleanup
+		CleanupTmuxSession(sm.config.GetSessionID())
+		return sm.ctx.Err()
+	}
 }
 
 // Stop stops all services
@@ -171,149 +212,18 @@ func (sm *ServiceManager) Stop() {
 	fmt.Printf("✅ Services stopped\n")
 }
 
-// startGotty starts gotty
-func (sm *ServiceManager) startGotty() error {
-	// Create gotty server options
-	fmt.Print("Starting gotty...")
-	sessionID := sm.config.GetSessionID()
-	options := &server.Options{
-		Address:         "127.0.0.1",
-		Port:            fmt.Sprintf("%d", sm.config.GottyPort),
-		Path:            "/" + sessionID,
-		PermitWrite:     true,
-		TitleFormat:     "Claude Code - " + sessionID,
-		WSOrigin:        ".*",                          // Allow WebSocket connections from any origin
-		EnableBasicAuth: sm.config.Password != "",      // Only enable HTTP basic auth when password is not empty
-	}
-
-	if sm.config.Password != "" {
-		options.Credential = sessionID + ":" + sm.config.Password // Set auth credential: username:password
-	}
-
-	// Build claude-code command with flags
-	command, args := sm.getClaudeCodeCommand()
-
-	// Create local command factory
-	backendOptions := &localcommand.Options{}
-	factory, err := localcommand.NewFactory(command, args, backendOptions)
-	if err != nil {
-		return fmt.Errorf("failed to create gotty factory: %w", err)
-	}
-
-	// Create gotty server
-	srv, err := server.New(factory, options)
-	if err != nil {
-		return fmt.Errorf("failed to create gotty server: %w", err)
-	}
-
-	// Start gotty server in a separate goroutine
-	go func() {
-		err := srv.Run(sm.ctx)
-		if err != nil && err != context.Canceled {
-			fmt.Printf("gotty server runtime error: %v\n", err)
-		}
-	}()
-
-	fmt.Print(" done\n")
-	return nil
-}
-
-// startPiko starts piko client
-func (sm *ServiceManager) startPiko() error {
-	// Create piko configuration
-	fmt.Printf("Starting piko...")
-	remote := sm.config.Remote
-	if strings.HasPrefix(remote, "http") {
-		remote = sm.config.Remote
-	} else {
-		remote = fmt.Sprintf("http://%s", sm.config.Remote)
-	}
-	sessionID := sm.config.GetSessionID()
-	conf := &config.Config{
-		Connect: config.ConnectConfig{
-			URL:     remote,
-			Timeout: 30 * time.Second,
-		},
-		Listeners: []config.ListenerConfig{
-			{
-				EndpointID: sessionID,
-				Protocol:   config.ListenerProtocolHTTP,
-				Addr:       fmt.Sprintf("127.0.0.1:%d", sm.config.GottyPort),
-				AccessLog:  false,
-				Timeout:    30 * time.Second,
-				TLS:        config.TLSConfig{},
-			},
-		},
-		Log: log.Config{
-			Level:      "info",
-			Subsystems: []string{},
-		},
-		GracePeriod: 30 * time.Second,
-	}
-
-	// Create logger
-	logger, err := log.NewLogger("info", []string{})
-	if err != nil {
-		return fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	// Validate configuration
-	if err := conf.Validate(); err != nil {
-		return fmt.Errorf("piko configuration validation failed: %w", err)
-	}
-
-	// Parse connection URL
-	connectURL, err := url.Parse(conf.Connect.URL)
-	if err != nil {
-		return fmt.Errorf("failed to parse connection URL: %w", err)
-	}
-
-	// Create TLS configuration
-	var tlsConfig *tls.Config
-	if sm.config.InsecureSkipVerify {
-		tlsConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-		fmt.Printf(" (HTTPS certificate verification skipped)")
-	}
-
-	// Create upstream client
-	upstream := &client.Upstream{
-		URL:       connectURL,
-		TLSConfig: tlsConfig,
-		Logger:    logger.WithSubsystem("client"),
-	}
-
-	// Create connections for each listener
-	for _, listenerConfig := range conf.Listeners {
-		ln, err := upstream.Listen(sm.ctx, listenerConfig.EndpointID)
-		if err != nil {
-			return fmt.Errorf("failed to listen on endpoint %s: %w", listenerConfig.EndpointID, err)
-		}
-
-		// Create HTTP proxy server
-		metrics := reverseproxy.NewMetrics("proxy")
-		server := reverseproxy.NewServer(listenerConfig, metrics, logger)
-		if server == nil {
-			return fmt.Errorf("failed to create HTTP proxy server")
-		}
-
-		// Start proxy server
-		go func() {
-			if err := server.Serve(ln); err != nil && err != context.Canceled {
-				fmt.Printf("proxy server runtime error: %v\n", err)
-			}
-		}()
-	}
-
-	fmt.Print(" done\n")
-	return nil
-}
-
 // getClaudeCodeCommand builds the claude-code command with flags and environment variables
 func (sm *ServiceManager) getClaudeCodeCommand() (string, []string) {
-	// Priority 1: Try to find 'claude' command in system PATH
-	command := sm.findClaudeCommand()
+	var command string
+	finder := commands.NewFinder(sm.config.CodeCmd)
+
+	// If custom command is specified and not "claude", use it
+	if customCmd, ok := finder.FindCustomCommand(); ok {
+		command = customCmd
+	} else {
+		// Use finder to locate the appropriate command
+		command = finder.FindCommand()
+	}
 
 	args := []string{}
 
@@ -324,150 +234,33 @@ func (sm *ServiceManager) getClaudeCodeCommand() (string, []string) {
 		args = append(args, flagParts...)
 	}
 
-	// Load environment variables with priority:
-	// 1. System environment variables (already in os.Environ())
-	// 2. .env file in current directory
-	// 3. Command-line --env flags (highest priority, overrides others)
-	sm.loadEnvironmentVariables()
+	// Use tmux for persistent sessions
+	// According to gotty docs: "gotty tmux new -A -s gotty top"
+	tmuxService := NewTmuxService(sm.config.GetSessionID())
+	if tmuxService.IsAvailable() {
+		tmuxPath, tmuxArgs, err := tmuxService.WrapCommand(command, args)
+		if err == nil {
+			return tmuxPath, tmuxArgs
+		}
+		// If tmux wrapping fails, fall through to direct command
+		fmt.Printf("Warning: tmux wrapping failed: %v, using direct command\n", err)
+	}
 
+	// Fallback: return command without tmux
 	return command, args
-}
-
-// findClaudeCommand searches for claude/claude-code command in priority order
-func (sm *ServiceManager) findClaudeCommand() string {
-	// Priority 1: Check if 'claude' command exists in PATH
-	if path, err := exec.LookPath("claude"); err == nil {
-		fmt.Printf("✓ Using claude command from: %s\n", path)
-		// Verify it's actually Claude Code
-		if sm.isClaudeCodeCommand("claude") {
-			return "claude"
-		}
-	}
-
-	// Priority 2: Check if 'claude-code' command exists in PATH
-	if path, err := exec.LookPath("claude-code"); err == nil {
-		fmt.Printf("✓ Using claude-code command from: %s\n", path)
-		return "claude-code"
-	}
-
-	// Priority 3: Check ~/.local/bin
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		localBinPath := filepath.Join(homeDir, ".local", "bin")
-		claudeCodePath := filepath.Join(localBinPath, "claude-code")
-		if _, err := os.Stat(claudeCodePath); err == nil {
-			// Add to PATH
-			currentPath := os.Getenv("PATH")
-			if !strings.Contains(currentPath, localBinPath) {
-				os.Setenv("PATH", localBinPath+":"+currentPath)
-				fmt.Printf("✓ Added %s to PATH\n", localBinPath)
-			}
-			fmt.Printf("✓ Using claude-code from: %s\n", claudeCodePath)
-			return "claude-code"
-		}
-	}
-
-	fmt.Println("⚠️  Warning: claude/claude-code command not found in PATH")
-	return "claude-code" // Default fallback
-}
-
-// isClaudeCodeCommand verifies if the command is actually Claude Code
-func (sm *ServiceManager) isClaudeCodeCommand(cmd string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	execCmd := exec.CommandContext(ctx, cmd, "--version")
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		return false
-	}
-
-	outputStr := string(output)
-	return strings.Contains(outputStr, "Claude Code") || strings.Contains(outputStr, "claude")
-}
-
-// loadEnvironmentVariables loads environment variables with proper priority
-func (sm *ServiceManager) loadEnvironmentVariables() {
-	// Priority 1: System environment variables are already loaded in os.Environ()
-
-	// Priority 2: Load from .env file if exists
-	sm.loadEnvFile()
-
-	// Priority 3: Command-line --env flags (highest priority, overrides all)
-	if len(sm.config.EnvVars) > 0 {
-		for _, envVar := range sm.config.EnvVars {
-			parts := strings.SplitN(envVar, "=", 2)
-			if len(parts) == 2 {
-				os.Setenv(parts[0], parts[1])
-			}
-		}
-	}
-}
-
-// loadEnvFile loads environment variables from .env file
-func (sm *ServiceManager) loadEnvFile() {
-	// Check for .env file in current directory
-	envFiles := []string{".env", ".claude.env"}
-
-	for _, envFile := range envFiles {
-		if _, err := os.Stat(envFile); err == nil {
-			fmt.Printf("✓ Loading environment variables from: %s\n", envFile)
-			sm.parseEnvFile(envFile)
-			return // Only load the first found file
-		}
-	}
-}
-
-// parseEnvFile parses a .env file and sets environment variables
-func (sm *ServiceManager) parseEnvFile(filename string) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse KEY=VALUE format
-		if strings.Contains(line, "=") {
-			parts := strings.SplitN(line, "=", 2)
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-
-			// Remove quotes if present
-			if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-				(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
-				value = value[1 : len(value)-1]
-			}
-
-			// Only set if not already set in system environment
-			// (Command-line env vars will override these later)
-			if _, exists := os.LookupEnv(key); !exists {
-				os.Setenv(key, value)
-			}
-		}
-	}
 }
 
 // daemonize forks the process to background and starts services
 func (sm *ServiceManager) daemonize() error {
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("daemon mode is not supported on Windows, use a service manager instead")
+	if !platform.SupportsDaemon() {
+		return fmt.Errorf("daemon mode is not supported on this platform")
 	}
 
-	// Get the path to save the PID file
-	homeDir, err := os.UserHomeDir()
+	// Get the path to save the log file
+	logFilePath, err := platform.GetLogFilePath()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to get log file path: %w", err)
 	}
-	pidFile := filepath.Join(homeDir, ".clauded.pid")
 
 	// Get the current executable path
 	execPath, err := os.Executable()
@@ -475,47 +268,53 @@ func (sm *ServiceManager) daemonize() error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	// Build arguments without the daemon flag
-	args := []string{}
-	for _, arg := range os.Args[1:] {
-		if arg != "-d" && arg != "--daemon" && !strings.HasPrefix(arg, "--daemon=") {
-			args = append(args, arg)
-		}
-	}
+	// Build arguments from config
+	args := sm.config.ToArgs()
 
 	// Create a new process that will run in background
-	// Set stdin to os.DevNull, and close stdout/stderr
 	cmd := exec.Command(execPath, args...)
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
 
-	// Set process to be detached from terminal
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
+	// Open log file for child process
+	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Redirect child's stdout and stderr to log file
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	// Don't set stdin - let child inherit /dev/null
+
+	// Set process to be detached from terminal (Unix only)
+	if platform.IsWindows() {
+		// Windows doesn't support daemon mode
+	} else {
+		// Don't use Setsid - it causes issues with file descriptors
+		// Just run in background without controlling terminal
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true, // Create new process group
+		}
 	}
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
+		logFile.Close()
 		return fmt.Errorf("failed to start daemon process: %w", err)
 	}
 
-	// Save PID to file
-	pid := cmd.Process.Pid
-	if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", pid)), 0644); err != nil {
-		fmt.Printf("Warning: failed to write PID file: %v\n", err)
-	}
+	// Don't close logFile immediately - let child process keep it open
+	// The file will be closed when parent process exits
 
 	// Print completion message
+	pid := cmd.Process.Pid
 	fmt.Printf("✅ Service started in background (daemon mode)\n")
 	fmt.Printf("   Process ID: %d\n", pid)
-	fmt.Printf("   PID file: %s\n", pidFile)
 	fmt.Printf("🌐 Access URL: http://localhost:%d\n", sm.config.GottyPort)
 	if sm.config.Password != "" {
 		fmt.Printf("🔐 HTTP auth: username=%s, password=%s\n", sm.config.GetSessionID(), sm.config.Password)
 	}
 	fmt.Printf("Session: %s\n", sm.config.GetSessionID())
-	fmt.Printf("To stop: kill %d\n", pid)
+	fmt.Printf("To stop: clauded session kill %s\n", sm.config.GetSessionID())
 
 	return nil
 }

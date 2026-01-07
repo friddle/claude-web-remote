@@ -90,6 +90,52 @@ configure_npm_mirror() {
     log_info "npm registry set to Aliyun mirror"
 }
 
+# Install tmux
+install_tmux() {
+    local os=$1
+    local use_mirror=$2
+
+    log_info "Checking tmux installation status..."
+
+    if command_exists tmux; then
+        local tmux_version=$(tmux -V)
+        log_info "tmux is already installed: $tmux_version"
+        return 0
+    fi
+
+    log_warn "tmux is not installed, starting installation..."
+
+    case $os in
+        macos)
+            if ! command_exists brew; then
+                log_error "Homebrew is not installed. Please install Homebrew or tmux manually."
+                return 1
+            fi
+            brew install tmux
+            ;;
+        debian|ubuntu)
+            sudo apt-get update
+            sudo apt-get install -y tmux
+            ;;
+        alpine)
+            sudo apk update
+            sudo apk add --no-cache tmux
+            ;;
+        *)
+            log_error "Unsupported operating system for automatic tmux installation: $os"
+            return 1
+            ;;
+    esac
+
+    if command_exists tmux; then
+        log_info "tmux installation completed: $(tmux -V)"
+        return 0
+    else
+        log_error "tmux installation failed"
+        return 1
+    fi
+}
+
 # Install Node.js
 install_nodejs() {
     local os=$1
@@ -248,6 +294,11 @@ main() {
         log_info "China network environment detected, will use Aliyun mirrors"
     else
         log_info "Using official mirrors (set USE_ALIYUN_MIRROR=true to use Aliyun mirrors)"
+    fi
+
+    # Install tmux
+    if ! install_tmux $os $use_mirror; then
+        log_warn "tmux installation failed or not supported. Some features may not work."
     fi
 
     # Install Node.js

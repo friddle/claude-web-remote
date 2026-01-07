@@ -1,3 +1,17 @@
+# Current Tasks (2026-01-07)
+
+- [x] **Client Validation**: Check env vars and command args for auth config. Warn if missing. Put logic in `cmd/client/src/validate.go`.
+- [x] **GoTTY Update**:
+    - Change dependency to `github.com/friddle/gotty` (use submodule approach).
+    - Scan for `tmux` and support it.
+    - Default install script must ensure `tmux` is installed.
+    - Enable `tmux` by default for multi-browser session sharing.
+- [x] **Daemon Mode Fix**:
+    - Print account/password credentials.
+    - Ensure `piko` and `gotty` start and *stay* running in daemon mode.
+- [x] **Mobile Client**: Set default address (not just placeholder).
+- [ ] **Cleanup**: Mark tasks as done.
+
 # TODO 任务清单
 
 ## 功能开发

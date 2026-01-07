@@ -8,6 +8,9 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"clauded-client/src/commands"
+	"clauded-client/src/platform"
 )
 
 //go:embed scripts/*.sh
@@ -25,51 +28,14 @@ func NewInstaller() *Installer {
 
 // IsClaudeCodeInstalled checks if claude or claude-code is installed
 func (i *Installer) IsClaudeCodeInstalled() bool {
-	// First check for 'claude' command (priority)
-	if _, err := exec.LookPath("claude"); err == nil {
-		// Verify it's actually Claude Code
-		if i.isClaudeCodeCommand("claude") {
-			return true
-		}
-	}
-
-	// Fallback to 'claude-code' command
-	_, err := exec.LookPath("claude-code")
-	return err == nil
-}
-
-// isClaudeCodeCommand verifies if the command is actually Claude Code
-func (i *Installer) isClaudeCodeCommand(cmd string) bool {
-	execCmd := exec.Command(cmd, "--version")
-	output, err := execCmd.Output()
-	if err != nil {
-		return false
-	}
-
-	outputStr := string(output)
-	return strings.Contains(outputStr, "Claude Code") || strings.Contains(outputStr, "claude")
+	finder := commands.NewFinder("claude")
+	return finder.IsInstalled()
 }
 
 // GetClaudeCodeVersion returns the installed claude-code version
 func (i *Installer) GetClaudeCodeVersion() (string, error) {
-	// Try 'claude' command first
-	if _, err := exec.LookPath("claude"); err == nil {
-		if i.isClaudeCodeCommand("claude") {
-			cmd := exec.Command("claude", "--version")
-			output, err := cmd.Output()
-			if err == nil {
-				return strings.TrimSpace(string(output)), nil
-			}
-		}
-	}
-
-	// Fallback to 'claude-code'
-	cmd := exec.Command("claude-code", "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get claude-code version: %w", err)
-	}
-	return strings.TrimSpace(string(output)), nil
+	finder := commands.NewFinder("claude")
+	return finder.GetVersion()
 }
 
 // Install runs the installation process
@@ -152,14 +118,7 @@ func (i *Installer) GetSupportedOS() []string {
 
 // IsOSSupported checks if the current OS is supported
 func (i *Installer) IsOSSupported() bool {
-	supported := false
-	for _, os := range i.GetSupportedOS() {
-		if runtime.GOOS == os {
-			supported = true
-			break
-		}
-	}
-	return supported
+	return platform.IsDarwin() || platform.IsLinux()
 }
 
 // DetectLinuxDistro detects the Linux distribution

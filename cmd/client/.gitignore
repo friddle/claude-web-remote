@@ -20,6 +20,8 @@ go.work
 # Build directories
 build/
 dist/
+output/
+release/
 
 # Coverage reports
 coverage.out
@@ -55,6 +57,9 @@ temp/
 
 # Binary files
 gottyp
-gottyp-* 
+gottyp-*
 sybran
+clauded
+clauded-client
+clauded-*
 
