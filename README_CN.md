@@ -27,7 +27,7 @@
 一键安装并启动:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh | bash
 ```
 
 这将:

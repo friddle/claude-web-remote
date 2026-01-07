@@ -6,7 +6,7 @@
 set -e
 
 VERSION="${VERSION:-v0.1}"
-REPO="friddle/clauded"
+REPO="friddle/claude-web-remote"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}"
 

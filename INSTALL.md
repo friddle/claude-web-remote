@@ -7,22 +7,22 @@
 ### 使用默认版本 (v0.1)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh | bash
 ```
 
 ### 指定版本
 
 ```bash
-VERSION=v0.2 curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+VERSION=v0.2 curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh | bash
 ```
 
 ### 下载后执行
 
 ```bash
 # 下载
-wget https://raw.githubusercontent.com/friddle/clauded/main/install.sh
+wget https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh
 # 或
-curl -O https://raw.githubusercontent.com/friddle/clauded/main/install.sh
+curl -O https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh
 
 # 执行
 chmod +x install.sh
@@ -165,7 +165,7 @@ clauded session kill work
 ## 更新到最新版本
 
 ```bash
-VERSION=latest curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+VERSION=latest curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh | bash
 ```
 
 ## 卸载
