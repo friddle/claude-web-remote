@@ -182,6 +182,12 @@ main() {
     log_info "Starting Claude Code installation..."
     log_info "Detecting operating system..."
 
+    # Check for proxy environment variables
+    if [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
+        log_info "Proxy detected: http_proxy=$http_proxy https_proxy=$https_proxy"
+        export http_proxy https_proxy
+    fi
+
     local os=$(detect_os)
     log_info "Detected OS: $os"
 
