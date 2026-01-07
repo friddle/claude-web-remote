@@ -2,6 +2,8 @@
 
 > Expose your local Claude Code through web terminal anywhere - perfect for remote access and mobile devices.
 
+⚠️ **Security Notice**: The quick start uses a demo server (clauded.friddle.me) for testing. For production use, we strongly recommend deploying your own self-hosted server to ensure full control over your data and security.
+
 ## Use Cases
 
 **🌍 Remote Access**
@@ -16,161 +18,141 @@
 
 ## Quick Start
 
-### 1. Deploy Server (one-time setup)
+### Option 1: Quick Demo (One-Line Install)
 
-Start the server on your remote machine:
+⚠️ **Before installing, make sure you have:**
+- Installed Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+- Configured your API key: `export ANTHROPIC_API_KEY='your-key'` or `claude auth login`
+
+Install and start in one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+```
+
+This will:
+1. Download the `clauded` binary to `/usr/local/bin`
+2. Connect to the demo server at `clauded.friddle.me:8022`
+3. Generate a random session and password
+4. Print the browser URL to access your Claude Code
+
+### Option 2: Self-Hosted Server (Recommended)
+
+For better security and control, deploy your own server:
+
+**1. Deploy the server on your remote machine:**
 
 ```bash
 cd server
 docker-compose up -d
 ```
 
-The server will expose two ports:
-- `8022` - for client connections
-- `8088` - for browser access
+The server will expose:
+- Port `8022` - for client connections
+- Port `8088` - for browser access
 
-### 2. Connect from Your Local Machine
+**2. Connect your local machine:**
+
+```bash
+# Set your API key
+export ANTHROPIC_API_KEY='your-key'
+
+# Start clauded
+clauded --host=your-server.com:8022 --session=my-session --password=mypass
+```
+
+**3. Access in browser:**
+
+```
+http://your-server.com:8088/my-session/
+```
+
+When prompted, enter your password.
+
+## Usage
+
+### Basic Connection
 
 ```bash
 # Local testing
 clauded --host=localhost:8022 --session=my-session --password=mypass
 
 # Remote server
-clauded --host=your-server.com:8022 --session=my-session --password=mypass
+clauded --host=myserver.com:8022 --session=my-session --password=mypass
+
+# Demo server
+clauded --host=clauded.friddle.me:8022 --session=my-session --password=mypass
 ```
 
-### 3. Access in Browser
-
-Open your browser and navigate to:
-
-```
-http://your-server:8088/my-session/
-```
-
-When prompted:
-- **Username**: `my-session`
-- **Password**: `mypass`
-
-## Usage Examples
-
-### Basic Remote Access
+### Set API Key
 
 ```bash
-# Connect to your server
-clauded --host=myserver.com:8022 --session=work --password=secure123
+# Method 1: Environment variable
+export ANTHROPIC_API_KEY='your-key'
+clauded --host=myserver.com:8022 --session=my-session --password=mypass
 
-# Now access from any browser:
-# http://myserver.com:8088/work/
-```
+# Method 2: Pass via --env
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+  --env ANTHROPIC_API_KEY='your-key'
 
-### Mobile Device Setup
-
-```bash
-# Start session on your local machine
-clauded --host=myserver.com:8022 --session=mobile --password=pass123
-
-# Open on your phone:
-# http://myserver.com:8088/mobile/
-# Login with username: mobile, password: pass123
-```
-
-### Auto-generated Credentials
-
-```bash
-# Let clauded generate session ID and password
-clauded --host=myserver.com:8022
-
-# Output will show:
-# ✓ Session ID: abc123
-# ✓ Password: xyz789
-# URL: http://myserver.com:8088/abc123/
+# Method 3: Use .env file in your project directory
+echo "ANTHROPIC_API_KEY=your-key" > .env
+clauded --host=myserver.com:8022 --session=my-session --password=mypass
 ```
 
 ### Pass Flags to Claude
 
 ```bash
-clauded --host=myserver.com:8022 \
-  --session=my-session \
-  --password=mypass \
+# Use specific model
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
   --flags='--model opus'
+
+# Multiple flags
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+  --flags='--model opus --max-tokens 4096'
 ```
 
 ### Use Different AI Tools
 
 ```bash
-# Use Claude (default)
+# Claude (default)
 clauded --host=myserver.com:8022 --session=my-session --password=mypass
 
-# Use OpenCode
-clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=opencode
+# OpenCode
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+  --codecmd=opencode
 
-# Use Kimi
-clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=kimi
+# Kimi
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+  --codecmd=kimi
 
-# Use Gemini
-clauded --host=myserver.com:8022 --session=my-session --password=mypass --codecmd=gemini
+# Gemini
+clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+  --codecmd=gemini
 ```
 
-### Environment Variables
-
-Create a `.env` file in your project:
+### Mobile Device Access
 
 ```bash
-ANTHROPIC_API_KEY=your_key_here
-MODEL=opus
-DEBUG=true
+# Start session on your local machine
+clauded --host=myserver.com:8022 --session=mobile --password=pass123
+
+# Access on your phone at: http://myserver.com:8088/mobile/
 ```
 
-The `.env` file is auto-loaded when you start clauded:
+### Multiple Sessions
+
+Run multiple sessions simultaneously:
 
 ```bash
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
-```
+# Terminal 1 - work session
+clauded --host=localhost:8022 --session=work --password=workpass
 
-Override with command-line args:
+# Terminal 2 - test session
+clauded --host=localhost:8022 --session=test --password=testpass
 
-```bash
-clauded --host=myserver.com:8022 --session=my-session \
-  --password=mypass --env MODEL=sonnet
-```
-
-## Installation
-
-### One-Line Install (Recommended)
-
-⚠️ **Before installing, make sure you have:**
-1. Installed Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
-2. Configured your API key: `export ANTHROPIC_API_KEY='your-key'`
-   Or authenticated: `claude auth login`
-
-**Install with one command:**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
-```
-
-Or specify version:
-
-```bash
-VERSION=v0.1 curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
-```
-
-See [INSTALL.md](INSTALL.md) for detailed installation instructions.
-
-### Build from Source
-
-**Client (Your Local Machine)**
-
-```bash
-cd cmd/client
-go build -o clauded .
-```
-
-**Server (Remote Machine)**
-
-```bash
-cd server
-docker-compose up -d
+# Terminal 3 - mobile session
+clauded --host=localhost:8022 --session=mobile --password=mobilepass
 ```
 
 ## Client Parameters
@@ -183,21 +165,6 @@ docker-compose up -d
 | `--codecmd` | - | claude | AI tool to use (claude, opencode, kimi, gemini) |
 | `--flags` | `-f` | Empty | Flags to pass to codecmd |
 | `--env` | `-e` | Empty | Environment variables (repeatable) |
-
-## Multiple Sessions
-
-Run multiple sessions simultaneously:
-
-```bash
-# Terminal 1 - for work
-clauded --host=localhost:8022 --session=work --password=workpass
-
-# Terminal 2 - for testing
-clauded --host=localhost:8022 --session=test --password=testpass
-
-# Terminal 3 - for mobile
-clauded --host=localhost:8022 --session=mobile --password=mobilepass
-```
 
 ## Troubleshooting
 
@@ -214,7 +181,10 @@ ClauDED automatically finds:
 - `claude-code` in system PATH
 - `~/.local/bin/claude-code`
 
-If not found, install Claude Code first.
+If not found, install Claude Code first:
+```bash
+npm install -g @anthropic-ai/claude-code
+```
 
 ## How It Works
 
