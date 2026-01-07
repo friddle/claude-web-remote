@@ -140,20 +140,21 @@ func runServe(name, session, password, codeCmd, remote, flags string, envVars []
 		return err
 	}
 
-	// Show security warning for default host
-	if config.IsDefaultHost() {
-		fmt.Printf("========================================\n")
-		fmt.Printf("⚠️  WARNING: Using public server!\n")
-		fmt.Printf("========================================\n")
-		fmt.Printf("Session: %s\n", config.Session)
+	// Show connection information
+	fmt.Printf("========================================\n")
+	fmt.Printf("✓ Session started successfully!\n")
+	fmt.Printf("========================================\n")
+	fmt.Printf("Session ID: %s\n", config.Session)
+	if config.Password != "" {
 		fmt.Printf("Password: %s\n", config.Password)
-		fmt.Printf("\nYour session is accessible at:\n")
-		fmt.Printf("%s/%s\n", config.GetHTTPURL(), config.Session)
-		fmt.Printf("\n⚠️  This is a PUBLIC server - NOT SECURE!\n")
-		fmt.Printf("Anyone with the session ID can access your session.\n")
-		fmt.Printf("For security, deploy your own server.\n")
-		fmt.Printf("========================================\n\n")
 	}
+	fmt.Printf("\nAccess URL:\n")
+	fmt.Printf("%s/%s\n", config.GetHTTPURL(), config.Session)
+	if config.IsDefaultHost() {
+		fmt.Printf("\n⚠️  WARNING: Using public demo server!\n")
+		fmt.Printf("For security, deploy your own server.\n")
+	}
+	fmt.Printf("========================================\n\n")
 
 	// Create service manager
 	manager := src.NewServiceManager(config)
