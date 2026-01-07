@@ -40,7 +40,7 @@ func (sm *ServiceManager) Start() error {
 	fmt.Printf("🚀 Starting clauded client\n")
 	fmt.Printf("Code command: %s\n", sm.config.CodeCmd)
 	fmt.Printf("Session ID: %s\n", sm.config.GetSessionID())
-	fmt.Printf("Remote server: %s\n", sm.config.Remote)
+	fmt.Printf("Remote server: %s\n", sm.config.GetHTTPURL())
 	fmt.Printf("Auto exit: %t\n", sm.config.AutoExit)
 
 	// Show security warning for default host

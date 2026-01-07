@@ -119,19 +119,24 @@ func ListSessions() {
 	})
 
 	fmt.Println("Active clauded sessions:")
-	fmt.Printf("%-10s %-8s %-8s %-25s %s\n", "SESSION ID", "PID", "PORT", "STARTED", "FLAGS")
-	fmt.Println(strings.Repeat("-", 80))
+	fmt.Printf("%-10s %-12s %-8s %-8s %-25s %s\n", "SESSION ID", "PASSWORD", "PID", "PORT", "STARTED", "FLAGS")
+	fmt.Println(strings.Repeat("-", 95))
 
 	for _, s := range sessions {
 		flags := s.Config.Flags
 		if flags == "" {
 			flags = "(default)"
 		}
-		fmt.Printf("%-10s %-8d %-8d %-25s %s\n", 
-			s.SessionID, 
-			s.PID, 
-			s.Port, 
-			s.StartTime.Format("2006-01-02 15:04:05"), 
+		password := s.Config.Password
+		if password == "" {
+			password = "(none)"
+		}
+		fmt.Printf("%-10s %-12s %-8d %-8d %-25s %s\n",
+			s.SessionID,
+			password,
+			s.PID,
+			s.Port,
+			s.StartTime.Format("2006-01-02 15:04:05"),
 			flags)
 	}
 }
@@ -161,6 +166,8 @@ func KillSession(target string) {
 			}
 		}
 		fmt.Printf("Killed %d sessions.\n", count)
+		fmt.Println()
+		ListSessions()
 	} else {
 		if killSingleSession(target) {
 			fmt.Printf("Session %s killed.\n", target)

@@ -171,6 +171,23 @@ func (c *Config) GetHTTPURL() string {
 	if !strings.HasPrefix(remote, "http://") && !strings.HasPrefix(remote, "https://") {
 		remote = "http://" + remote
 	}
+
+	// Parse URL to remove port
+	if strings.HasPrefix(remote, "https://") {
+		host := strings.TrimPrefix(remote, "https://")
+		// Remove port part
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+		return "https://" + host
+	} else if strings.HasPrefix(remote, "http://") {
+		host := strings.TrimPrefix(remote, "http://")
+		// Remove port part
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+		return "http://" + host
+	}
 	return remote
 }
 
@@ -178,38 +195,23 @@ func (c *Config) GetHTTPURL() string {
 func (c *Config) GetPikoAddress() string {
 	remote := c.Remote
 
-	// Extract host and port
+	// Extract host and remove port for default WebSocket ports
 	if strings.HasPrefix(remote, "https://") {
 		remote = strings.TrimPrefix(remote, "https://")
-		// For HTTPS, assume piko uses port 8022 (default)
-		parts := strings.Split(remote, ":")
-		if len(parts) >= 2 && parts[1] == "443" {
-			// User specified default HTTPS port, use default piko port
-			return parts[0] + ":8022"
-		} else if len(parts) >= 2 {
-			// User specified custom port, use it
-			return parts[0] + ":" + parts[1]
+		// Remove port part to use default 443 for wss://
+		if idx := strings.Index(remote, ":"); idx != -1 {
+			remote = remote[:idx]
 		}
-		return parts[0] + ":8022"
+		return "https://" + remote
 	} else if strings.HasPrefix(remote, "http://") {
 		remote = strings.TrimPrefix(remote, "http://")
-		// For HTTP, check if it's default port or custom port
-		parts := strings.Split(remote, ":")
-		if len(parts) >= 2 && parts[1] == "80" {
-			// User specified default HTTP port, use default piko port
-			return parts[0] + ":8022"
-		} else if len(parts) >= 2 {
-			// User specified custom port
-			// Special case: for localhost, assume default piko port (for testing)
-			if parts[0] == "localhost" || parts[0] == "127.0.0.1" {
-				return "localhost:8022"
-			}
-			// For remote servers, use the specified port
-			return parts[0] + ":" + parts[1]
+		// Remove port part to use default 80 for ws://
+		if idx := strings.Index(remote, ":"); idx != -1 {
+			remote = remote[:idx]
 		}
-		return parts[0] + ":8022"
+		return "http://" + remote
 	} else {
-		// No protocol specified, use as-is (might be host:port format)
+		// No protocol specified, use as-is
 		return remote
 	}
 }

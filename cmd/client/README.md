@@ -91,6 +91,22 @@ export AUTO_EXIT="true"
 gottyp
 ```
 
+### 默认启动命令
+
+使用自定义 API 端点时的默认启动方式：
+
+```bash
+export ANTHROPIC_BASE_URL="https://open.bigmodel.cn/api/anthropic"
+export ANTHROPIC_AUTH_TOKEN="token_xxx_xx"
+claude --allow-dangerously-skip-permissions --dangerously-skip-permissions
+```
+
+**说明**:
+- `ANTHROPIC_BASE_URL`: 自定义 API 端点地址
+- `ANTHROPIC_AUTH_TOKEN`: 认证令牌（格式：`token_xxx_xx`）
+- `--allow-dangerously-skip-permissions`: 跳过权限检查
+- `--dangerously-skip-permissions`: 危险地跳过权限检查（需谨慎使用）
+
 ## 故障排除
 
 ### 常见问题

@@ -84,6 +84,17 @@ Claude Code from anywhere via a web browser.`,
 	}
 	sessionCmd.AddCommand(killCmd)
 
+	// Subcommand: kill-all
+	killAllCmd := &cobra.Command{
+		Use:   "kill-all",
+		Short: "Kill all sessions",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			src.KillSession("all")
+		},
+	}
+	sessionCmd.AddCommand(killAllCmd)
+
 	return rootCmd
 }
 
@@ -101,7 +112,7 @@ func runServe(name, session, password, codeCmd, remote, flags string, envVars []
 
 	// Set default remote if not specified
 	if remote == "" {
-		remote = "https://clauded.friddle.me"
+		remote = "https://clauded.friddle.me:8022"
 	}
 
 	// Create configuration
