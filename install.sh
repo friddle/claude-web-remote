@@ -130,7 +130,7 @@ show_env_reminder() {
 
 # Download binary
 download_binary() {
-    print_info "Downloading clauded ${VERSION} for ${PLATFORM}..."
+    print_info "Downloading clauded ${VERSION} for ${PLATFORM}..." >&2
 
     BINARY_NAME="clauded-${PLATFORM}"
     DOWNLOAD_URL="${DOWNLOAD_URL}/${BINARY_NAME}"
@@ -139,12 +139,13 @@ download_binary() {
     BINARY_PATH="${TEMP_DIR}/clauded"
 
     if ! $DOWNLOAD_CMD "${DOWNLOAD_URL}" -o "$BINARY_PATH"; then
-        print_error "Failed to download clauded from ${DOWNLOAD_URL}"
+        print_error "Failed to download clauded from ${DOWNLOAD_URL}" >&2
         rm -rf "$TEMP_DIR"
         exit 1
     fi
 
-    print_success "Downloaded to $BINARY_PATH"
+    print_success "Downloaded to $BINARY_PATH" >&2
+    # Only output TEMP_DIR to stdout
     echo "$TEMP_DIR"
 }
 
