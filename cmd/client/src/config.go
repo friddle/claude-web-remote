@@ -15,7 +15,6 @@ import (
 
 // Config configuration structure
 type Config struct {
-	Name               string   `json:"name"`               // deprecated: piko client name
 	Remote             string   `json:"remote"`             // remote server address (format: https://host or host:port)
 	Session            string   `json:"session"`            // session ID (auto-generated if empty)
 	Password           string   `json:"-"`                  // password for authentication (hidden from JSON)
@@ -32,7 +31,6 @@ type Config struct {
 // NewConfig creates a new configuration instance
 func NewConfig() *Config {
 	return &Config{
-		Name:               getEnvOrDefault("NAME", ""),
 		Remote:             getEnvOrDefault("REMOTE", ""),
 		Session:            getEnvOrDefault("SESSION", ""),
 		Password:           getEnvOrDefault("PASSWORD", ""),
@@ -82,11 +80,7 @@ func (c *Config) Validate() error {
 	} else {
 		// For custom hosts, session is optional, use short session ID
 		if c.Session == "" {
-			if c.Name != "" {
-				c.Session = c.Name
-			} else {
-				c.Session = generateShortSessionID()
-			}
+			c.Session = generateShortSessionID()
 		}
 		// Password is optional for custom hosts
 	}

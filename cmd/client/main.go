@@ -19,7 +19,6 @@ func main() {
 
 func MakeMainCmd() *cobra.Command {
 	var (
-		name               string
 		session            string
 		password           string
 		codeCmd            string
@@ -39,12 +38,11 @@ func MakeMainCmd() *cobra.Command {
 through gotty and piko services to a remote server, allowing you to access and use
 Claude Code from anywhere via a web browser.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(name, session, password, codeCmd, remote, flags, envVars, autoExit, insecureSkipVerify, skipInstall, daemon)
+			return runServe(session, password, codeCmd, remote, flags, envVars, autoExit, insecureSkipVerify, skipInstall, daemon)
 		},
 	}
 
 	// Add command line flags to root command
-	rootCmd.Flags().StringVar(&name, "name", "", "Client identifier name (deprecated, use --session)")
 	rootCmd.Flags().StringVar(&remote, "remote", "", "Remote server address (default: https://clauded.friddle.me)")
 	rootCmd.Flags().StringVar(&session, "session", "", "Session ID (auto-generated for default server)")
 	rootCmd.Flags().StringVar(&password, "password", "", "Password for authentication (auto-generated for default server)")
@@ -98,7 +96,7 @@ Claude Code from anywhere via a web browser.`,
 	return rootCmd
 }
 
-func runServe(name, session, password, codeCmd, remote, flags string, envVars []string, autoExit, insecureSkipVerify, skipInstall, daemon bool) error {
+func runServe(session, password, codeCmd, remote, flags string, envVars []string, autoExit, insecureSkipVerify, skipInstall, daemon bool) error {
 	// Check and install claude-code if needed (only for claude command)
 	if !skipInstall && codeCmd == "claude" {
 		installer := src.NewInstaller()
@@ -117,7 +115,6 @@ func runServe(name, session, password, codeCmd, remote, flags string, envVars []
 
 	// Create configuration
 	config := &src.Config{
-		Name:               name,
 		Remote:             remote,
 		Session:            session,
 		Password:           password,
