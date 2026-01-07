@@ -69,6 +69,10 @@ http://your-server.com:8088/my-session/
 
 输入密码即可访问。
 
+**客户端运行示例:**
+
+![运行客户端](pic/run_client.png)
+
 ## 使用方法
 
 ### 基本连接
@@ -154,6 +158,10 @@ clauded --host=localhost:8022 --session=test --password=testpass
 # 终端 3 - 移动会话
 clauded --host=localhost:8022 --session=mobile --password=mobilepass
 ```
+
+**Web 界面示例:**
+
+![Web 使用界面](pic/web_usage.png)
 
 ## 客户端参数
 

@@ -69,6 +69,10 @@ http://your-server.com:8088/my-session/
 
 When prompted, enter your password.
 
+**Client running example:**
+
+![Run Client](pic/run_client.png)
+
 ## Usage
 
 ### Basic Connection
@@ -154,6 +158,10 @@ clauded --host=localhost:8022 --session=test --password=testpass
 # Terminal 3 - mobile session
 clauded --host=localhost:8022 --session=mobile --password=mobilepass
 ```
+
+**Web interface example:**
+
+![Web Usage](pic/web_usage.png)
 
 ## Client Parameters
 
