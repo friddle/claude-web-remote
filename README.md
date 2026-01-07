@@ -136,18 +136,37 @@ clauded --host=myserver.com:8022 --session=my-session \
 
 ## Installation
 
-### Client (Your Local Machine)
+### One-Line Install (Recommended)
 
-Build from source:
+⚠️ **Before installing, make sure you have:**
+1. Installed Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+2. Configured your API key: `export ANTHROPIC_API_KEY='your-key'`
+   Or authenticated: `claude auth login`
+
+**Install with one command:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+```
+
+Or specify version:
+
+```bash
+VERSION=v0.1 curl -fsSL https://raw.githubusercontent.com/friddle/clauded/main/install.sh | bash
+```
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+
+### Build from Source
+
+**Client (Your Local Machine)**
 
 ```bash
 cd cmd/client
 go build -o clauded .
 ```
 
-### Server (Remote Machine)
-
-Use Docker Compose:
+**Server (Remote Machine)**
 
 ```bash
 cd server

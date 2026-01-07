@@ -43,6 +43,20 @@ build-arm64:
 	docker build --platform linux/arm64 -t ${IMAGE_NAME}:arm64 .
 	@echo "Docker image built: ${IMAGE_NAME}:arm64"
 
+# Build multi-arch image (AMD64 & ARM64)
+.PHONY: build-multiarch
+build-multiarch:
+	@echo "Building ${IMAGE_NAME} multi-arch Docker image (linux/amd64 & linux/arm64)..."
+	docker buildx build --platform linux/amd64,linux/arm64 -t ${IMAGE_NAME}:latest .
+	@echo "Multi-arch Docker image built: ${IMAGE_NAME}:latest"
+
+# Build and push multi-arch image
+.PHONY: push-multiarch
+push-multiarch:
+	@echo "Building and pushing ${IMAGE_NAME} multi-arch Docker image..."
+	docker buildx build --platform linux/amd64,linux/arm64 -t ${IMAGE_NAME}:latest --push .
+	@echo "Multi-arch image built and pushed: ${IMAGE_NAME}:latest"
+
 # Build and push Docker image
 .PHONY: push
 push: build
@@ -98,12 +112,17 @@ clean:
 .PHONY: help
 help:
 	@echo "Available Make targets:"
-	@echo "  build         - Build Docker image"
-	@echo "  build-go      - Build Go binary only"
-	@echo "  push          - Build and push Docker image"
-	@echo "  build-version - Build with version tag"
-	@echo "  push-version  - Push with version tag"
-	@echo "  up            - Start with docker-compose"
-	@echo "  down          - Stop docker-compose"
-	@echo "  logs          - View docker-compose logs"
-	@echo "  clean         - Clean build files"
+	@echo "  build           - Build Docker image (native)"
+	@echo "  build-amd64     - Build Docker image (linux/amd64)"
+	@echo "  build-arm64     - Build Docker image (linux/arm64)"
+	@echo "  build-multiarch - Build multi-arch Docker image (amd64 & arm64)"
+	@echo "  push            - Build and push Docker image (native)"
+	@echo "  push-amd64      - Build and push (amd64)"
+	@echo "  push-multiarch  - Build and push multi-arch image"
+	@echo "  build-go        - Build Go binary only"
+	@echo "  build-version   - Build with version tag"
+	@echo "  push-version    - Push with version tag"
+	@echo "  up              - Start with docker-compose"
+	@echo "  down            - Stop docker-compose"
+	@echo "  logs            - View docker-compose logs"
+	@echo "  clean           - Clean build files"

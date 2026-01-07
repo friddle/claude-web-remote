@@ -49,7 +49,14 @@ func (h *Handler) SetupRoutes() *gin.Engine {
 		api.GET("/subscriptions", h.GetSubscriptions)
 	}
 
-	// Proxy all requests to /:session/* to piko
+	// Root path "/" -> proxy to piko as "root-service"
+	router.Any("/", gin.WrapH(h.proxyManager.ProxyRootRequest()))
+
+	// /piko path -> proxy to piko as "root-service"
+	router.Any("/piko", gin.WrapH(h.proxyManager.ProxyRootRequest()))
+	router.Any("/piko/*path", gin.WrapH(h.proxyManager.ProxyRootRequest()))
+
+	// Proxy all requests to /:session/* to piko as session-based service
 	// This handles both HTTP and WebSocket connections
 	router.Any("/:session/*path", gin.WrapH(h.proxyManager.ProxyRequest()))
 

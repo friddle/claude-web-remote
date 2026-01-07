@@ -87,6 +87,56 @@ func (m *Manager) ProxyRequest() http.HandlerFunc {
 	}
 }
 
+// ProxyRootRequest creates a handler that proxies requests to piko as root-service
+// This is used for "/" and "/piko" paths
+func (m *Manager) ProxyRootRequest() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Create proxy director
+		targetURL, _ := url.Parse(m.pikoProxyURL)
+		proxy := &httputil.ReverseProxy{
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				// Set the target URL
+				pr.Out.URL = targetURL
+				pr.Out.URL.Path = r.URL.Path
+				pr.Out.URL.RawQuery = r.URL.RawQuery
+
+				// Set piko endpoint header to root-service
+				pr.Out.Header.Set("X-Piko-Endpoint", "root-service")
+
+				// Copy other headers
+				pr.Out.Header.Set("X-Forwarded-Host", r.Host)
+				pr.Out.Header.Set("X-Forwarded-Proto", scheme(r))
+
+				// Handle WebSocket upgrade
+				if r.Header.Get("Upgrade") == "websocket" {
+					pr.Out.Header.Set("Upgrade", "websocket")
+					pr.Out.Header.Set("Connection", "upgrade")
+				}
+			},
+			ModifyResponse: func(resp *http.Response) error {
+				// If Piko returns 502, it means the upstream (client) is not connected.
+				// We map this to 404 to indicate "Session Not Found".
+				if resp.StatusCode == http.StatusBadGateway {
+					resp.StatusCode = http.StatusNotFound
+				}
+				return nil
+			},
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Printf("Proxy error for root service: %v", err)
+				// If we can't connect to Piko proxy (localhost), that's a 502.
+				// If Piko returns 502 (handled in ModifyResponse), it's a 404.
+				http.Error(w, "Proxy error", http.StatusBadGateway)
+			},
+		}
+
+		// Flush the response after writing to support SSE/WebSocket
+		proxy.FlushInterval = 100 * time.Millisecond
+
+		// Serve the proxy
+		proxy.ServeHTTP(w, r)
+	}
+}
+
 
 // scheme returns the scheme of the request (http or https)
 func scheme(r *http.Request) string {
