@@ -170,9 +170,11 @@ clauded --host=localhost:8022 --session=mobile --password=mobilepass
 
 ### 连接失败
 
+**访问地址:** 所有浏览器访问统一使用 `http://服务器IP:8088/`
+
 确保防火墙允许:
-- 端口 `8022` - 客户端到服务器
-- 端口 `8088` - 浏览器到服务器
+- 端口 `8022` - 客户端到服务器（用于 clauded 连接）
+- 端口 `8088` - 浏览器到服务器（默认端口，可在 docker-compose.yaml 中修改）
 
 ### 找不到 Claude 命令
 

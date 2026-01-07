@@ -170,9 +170,11 @@ clauded --host=localhost:8022 --session=mobile --password=mobilepass
 
 ### Connection Failed
 
+**Access URL:** All browser access goes through `http://your-server-ip:8088/`
+
 Ensure firewall allows:
-- Port `8022` - client to server
-- Port `8088` - browser to server
+- Port `8022` - client to server (for clauded connections)
+- Port `8088` - browser to server (default, can be modified in docker-compose.yaml)
 
 ### Claude Command Not Found
 
