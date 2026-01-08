@@ -166,48 +166,18 @@ func (c *Config) GetHTTPURL() string {
 		remote = "http://" + remote
 	}
 
-	// Parse URL to remove port
-	if strings.HasPrefix(remote, "https://") {
-		host := strings.TrimPrefix(remote, "https://")
-		// Remove port part
-		if idx := strings.Index(host, ":"); idx != -1 {
-			host = host[:idx]
-		}
-		return "https://" + host
-	} else if strings.HasPrefix(remote, "http://") {
-		host := strings.TrimPrefix(remote, "http://")
-		// Remove port part
-		if idx := strings.Index(host, ":"); idx != -1 {
-			host = host[:idx]
-		}
-		return "http://" + host
-	}
+	// Return as is - let the browser/client handle the port
+	// The previous logic was aggressively stripping ports which breaks non-standard port usage
 	return remote
 }
 
 // GetPikoAddress returns the piko server address (host:port)
 func (c *Config) GetPikoAddress() string {
 	remote := c.Remote
-
-	// Extract host and remove port for default WebSocket ports
-	if strings.HasPrefix(remote, "https://") {
-		remote = strings.TrimPrefix(remote, "https://")
-		// Remove port part to use default 443 for wss://
-		if idx := strings.Index(remote, ":"); idx != -1 {
-			remote = remote[:idx]
-		}
-		return "https://" + remote
-	} else if strings.HasPrefix(remote, "http://") {
-		remote = strings.TrimPrefix(remote, "http://")
-		// Remove port part to use default 80 for ws://
-		if idx := strings.Index(remote, ":"); idx != -1 {
-			remote = remote[:idx]
-		}
-		return "http://" + remote
-	} else {
-		// No protocol specified, use as-is
-		return remote
-	}
+	// No automatic path modification.
+	// Users must specify the full upstream URL if it's different from the root.
+	// The server now supports /v1/upstream routing directly.
+	return remote
 }
 
 // FindAvailablePort finds an available port starting from DefaultGottyPortStart

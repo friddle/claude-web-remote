@@ -1,30 +1,38 @@
-FROM docker.linkos.org/openresty/openresty:1.25.3.2-5-alpine-fat
+# Build stage
+FROM docker.linkos.org/library/golang:1.23-alpine AS builder
 
-# 安装必要的工具 
-RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.aliyun.com#g' /etc/apk/repositories
-RUN apk add --no-cache curl bash
-
-ENV PIKO_UPSTREAM_PORT=8022
-ENV LISTEN_PORT=8080
-# 从piko镜像复制二进制文件
-COPY --from=ghcr.linkos.org/andydunstall/piko:latest /bin/piko /usr/local/bin/piko
-
-# 设置工作目录
 WORKDIR /app
 
-# 复制启动脚本和配置文件
-COPY build/start.sh /app/start.sh
-COPY build/nginx.conf /etc/nginx/nginx.conf
-COPY build/piko.conf /etc/nginx/conf.d/piko.conf
+# Install build dependencies
+RUN apk add --no-cache git
 
-# 创建日志目录
-RUN mkdir -p /var/log/nginx
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
 
-# 设置脚本权限
-RUN chmod +x /app/start.sh
+# Copy source code
+COPY . .
 
-# 暴露端口
-EXPOSE 8088 8022 8023
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
-# 启动命令
-CMD ["/app/start.sh"]
+# Runtime stage
+FROM docker.linkos.org/library/alpine:latest
+
+WORKDIR /app
+
+# Install ca-certificates for HTTPS
+RUN apk --no-cache add ca-certificates curl
+
+# Copy the binary from builder
+COPY --from=builder /app/server .
+
+# Expose ports
+EXPOSE 80 8022 8023
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:80/health || exit 1
+
+# Run the server
+CMD ["./server"]

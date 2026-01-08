@@ -20,7 +20,7 @@ func Load() *Config {
 	return &Config{
 		PikoUpstreamPort: getEnvInt("PIKO_UPSTREAM_PORT", 8022),
 		PikoToken:        getEnvOrDefault("PIKO_TOKEN", ""),
-		ListenPort:       getEnvInt("LISTEN_PORT", 8088),
+		ListenPort:       getEnvInt("LISTEN_PORT", 80),
 		EnableTLS:        getEnvBool("ENABLE_TLS", false),
 		TLSCertFile:      getEnvOrDefault("TLS_CERT_FILE", ""),
 		TLSKeyFile:       getEnvOrDefault("TLS_KEY_FILE", ""),

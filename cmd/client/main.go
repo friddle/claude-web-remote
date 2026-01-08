@@ -110,7 +110,7 @@ func runServe(session, password, codeCmd, remote, flags string, envVars []string
 
 	// Set default remote if not specified
 	if remote == "" {
-		remote = "https://clauded.friddle.me:8022"
+		remote = "https://clauded.friddle.me"
 	}
 
 	// Create configuration

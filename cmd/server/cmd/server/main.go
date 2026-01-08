@@ -31,7 +31,7 @@ func main() {
 	notificationSvc := notification.NewService()
 
 	// Create proxy manager (piko proxy port is 8023)
-	proxyMgr := proxy.NewManager(8023)
+	proxyMgr := proxy.NewManager(8023, cfg.PikoUpstreamPort)
 
 	// Create HTTP handler
 	handler := handlers.NewHandler(cfg, sessionMgr, notificationSvc, proxyMgr)

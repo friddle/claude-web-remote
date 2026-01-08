@@ -28,11 +28,11 @@ RUN apk --no-cache add ca-certificates curl
 COPY --from=builder /app/server .
 
 # Expose ports
-EXPOSE 8022 8023 8088
+EXPOSE 80 8022 8023
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8088/health || exit 1
+  CMD curl -f http://localhost:80/health || exit 1
 
 # Run the server
 CMD ["./server"]

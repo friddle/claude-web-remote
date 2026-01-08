@@ -171,7 +171,12 @@ func (sm *ServiceManager) startServices() error {
 	defer removeSessionInfo(sessionID)
 
 	fmt.Printf("✅ Services started successfully!\n")
-	fmt.Printf("🌐 Access URL: http://localhost:%d\n", sm.config.GottyPort)
+	
+	// Construct remote access URL
+	remoteURL := fmt.Sprintf("%s/%s", strings.TrimRight(sm.config.GetHTTPURL(), "/"), sm.config.GetSessionID())
+	fmt.Printf("🌐 Access URL: %s\n", remoteURL)
+	fmt.Printf("🔒 Local URL: http://localhost:%d\n", sm.config.GottyPort)
+	
 	if sm.config.Password != "" {
 		fmt.Printf("🔐 HTTP auth: username=%s, password=%s\n", sessionID, sm.config.Password)
 	} else {

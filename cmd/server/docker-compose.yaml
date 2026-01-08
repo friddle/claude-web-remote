@@ -9,16 +9,15 @@ services:
     container_name: clauded-port-forward
     environment:
       - PIKO_UPSTREAM_PORT=8022
-      - LISTEN_PORT=8088
       - ENABLE_TLS=false
       # - PIKO_TOKEN=your-token-here  # Optional: add token for authentication
     ports:
-      - "8022:8022"  # piko upstream port (for client connections)
-      - "8088:8088"  # HTTP access port (main API)
+      - "80:80"  # HTTP access port (main API & Agent connection)
       # Note: 8023 is piko proxy port, internal only
+      # Note: 8022 is piko upstream port, internal only (proxied via 80)
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3

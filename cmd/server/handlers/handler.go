@@ -52,16 +52,17 @@ func (h *Handler) SetupRoutes() *gin.Engine {
 	// Root path "/" -> proxy to piko as "root-service"
 	router.Any("/", gin.WrapH(h.proxyManager.ProxyRootRequest()))
 
-	// /piko path -> proxy to piko as "root-service"
-	router.Any("/piko", gin.WrapH(h.proxyManager.ProxyRootRequest()))
-	router.Any("/piko/*path", gin.WrapH(h.proxyManager.ProxyRootRequest()))
+	// Piko Upstream (Agent) connection path
+	// This handles direct connections to /v1/upstream/... without /piko prefix
+	router.Any("/v1/upstream/*path", gin.WrapH(h.proxyManager.ProxyUpstreamRequest()))
 
-	// Proxy all requests to /:session/* to piko as session-based service
-	// This handles both HTTP and WebSocket connections
-	router.Any("/:session/*path", gin.WrapH(h.proxyManager.ProxyRequest()))
+	// /piko path -> proxy to piko upstream (legacy/compatibility)
+	router.Any("/piko/*path", gin.WrapH(h.proxyManager.ProxyUpstreamRequest()))
+	router.Any("/piko", gin.WrapH(h.proxyManager.ProxyUpstreamRequest()))
 
-	// Also handle requests to /:session (without trailing path)
-	router.Any("/:session", gin.WrapH(h.proxyManager.ProxyRequest()))
+	// Catch-all: Proxy all other requests to piko as session-based service
+	// This handles /:session, /:session/, /:session/*path, etc.
+	router.NoRoute(gin.WrapH(h.proxyManager.ProxyRequest()))
 
 	return router
 }
