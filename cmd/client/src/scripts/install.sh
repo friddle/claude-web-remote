@@ -15,6 +15,9 @@ NC='\033[0m' # No Color
 INSTALL_DIR="$HOME/.local/bin"
 NPM_INSTALL_CMD="npm install -g"
 
+# Ensure common paths are in PATH
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # Logging functions
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
