@@ -77,6 +77,22 @@ func (sm *ServiceManager) startServices() error {
 	envLoader := environment.NewLoader(sm.config.EnvVars)
 	envLoader.Load()
 
+	// Debug: Verify environment variables
+	fmt.Printf("DEBUG: Checking loaded environment variables:\n")
+	for _, env := range sm.config.EnvVars {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) > 0 {
+			key := parts[0]
+			val := os.Getenv(key)
+			// Mask sensitive values for display if needed, but for now show existence
+			displayVal := val
+			if len(displayVal) > 10 {
+				displayVal = displayVal[:4] + "..." + displayVal[len(displayVal)-4:]
+			}
+			fmt.Printf("  - %s=%s (Current Value: %s)\n", key, parts[1], displayVal)
+		}
+	}
+
 	// Start piko service
 	g.Add(func() error {
 		pikoConfig := services.PikoConfig{
@@ -243,7 +259,7 @@ func (sm *ServiceManager) getClaudeCodeCommand() (string, []string) {
 	// According to gotty docs: "gotty tmux new -A -s gotty top"
 	tmuxService := NewTmuxService(sm.config.GetSessionID())
 	if tmuxService.IsAvailable() {
-		tmuxPath, tmuxArgs, err := tmuxService.WrapCommand(command, args)
+		tmuxPath, tmuxArgs, err := tmuxService.WrapCommand(command, args, sm.config.EnvVars)
 		if err == nil {
 			return tmuxPath, tmuxArgs
 		}
