@@ -49,10 +49,10 @@ detect_platform() {
     ARCH="$(uname -m)"
 
     case "$OS" in
-        Linux*)
+        Linux*) 
             OS="linux"
             ;;
-        Darwin*)
+        Darwin*) 
             OS="darwin"
             ;;
         *)
@@ -101,32 +101,6 @@ check_prerequisites() {
     fi
 
     print_success "前置条件检查通过"
-}
-
-# 显示环境设置提醒
-show_env_reminder() {
-    echo ""
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}  重要提示: Claude Code 环境配置${NC}"
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "${RED}在启动 clauded 之前，请确保已完成:${NC}"
-    echo ""
-    echo "1. 安装 Claude Code CLI:"
-    echo "   npm install -g @anthropic-ai/claude-code"
-    echo ""
-    echo "2. 配置 Anthropic API 密钥:"
-    echo "   export ANTHROPIC_API_KEY='your-api-key-here'"
-    echo ""
-    echo "3. 或使用 Claude Code 认证:"
-    echo "   claude auth login"
-    echo ""
-    echo "4. 如需使用自定义 API 端点，请配置:"
-    echo "   export ANTHROPIC_BASE_URL='https://your-endpoint.com'"
-    echo "   export ANTHROPIC_AUTH_TOKEN='your-token'"
-    echo ""
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
 }
 
 # 下载二进制文件
@@ -188,7 +162,8 @@ verify_installation() {
         print_error "在 PATH 中找不到 clauded"
         print_info "请将 $INSTALL_DIR 添加到您的 PATH:"
         echo ""
-        echo "  export PATH=\"\$PATH:$INSTALL_DIR\""
+        echo "  export PATH=\"
+$PATH:$INSTALL_DIR\""
         echo ""
         exit 1
     fi
@@ -254,9 +229,6 @@ start_clauded() {
 main() {
     print_header
 
-    # 首先显示环境提醒
-    show_env_reminder
-
     # 请求确认
     read -p "是否继续安装? (y/N) " -n 1 -r
     echo
@@ -274,6 +246,7 @@ main() {
 
     echo ""
     print_success "安装完成!"
+    echo "提示: 如果未发现 Claude Code，clauded 将会自动进行安装。"
     echo ""
 
     # 询问用户是否立即启动 clauded

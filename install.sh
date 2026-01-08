@@ -48,10 +48,10 @@ detect_platform() {
     ARCH="$(uname -m)"
 
     case "$OS" in
-        Linux*)
+        Linux*) 
             OS="linux"
             ;;
-        Darwin*)
+        Darwin*) 
             OS="darwin"
             ;;
         *)
@@ -61,10 +61,10 @@ detect_platform() {
     esac
 
     case "$ARCH" in
-        x86_64|amd64)
+        x86_64|amd64) 
             ARCH="amd64"
             ;;
-        aarch64|arm64)
+        aarch64|arm64) 
             ARCH="arm64"
             ;;
         *)
@@ -100,32 +100,6 @@ check_prerequisites() {
     fi
 
     print_success "Prerequisites check passed"
-}
-
-# Display environment setup reminder
-show_env_reminder() {
-    echo ""
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}  IMPORTANT: Claude Code Environment Setup${NC}"
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "${RED}Before starting clauded, make sure you have:${NC}"
-    echo ""
-    echo "1. Installed Claude Code CLI:"
-    echo "   npm install -g @anthropic-ai/claude-code"
-    echo ""
-    echo "2. Configured your Anthropic API key:"
-    echo "   export ANTHROPIC_API_KEY='your-api-key-here'"
-    echo ""
-    echo "3. OR authenticated with Claude Code:"
-    echo "   claude auth login"
-    echo ""
-    echo "4. For custom API endpoints, configure:"
-    echo "   export ANTHROPIC_BASE_URL='https://your-endpoint.com'"
-    echo "   export ANTHROPIC_AUTH_TOKEN='your-token'"
-    echo ""
-    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
 }
 
 # Download binary
@@ -187,9 +161,7 @@ verify_installation() {
         print_error "Clauded binary not found in PATH"
         print_info "Add $INSTALL_DIR to your PATH:"
         echo ""
-        echo "  export PATH=\"\$PATH:$INSTALL_DIR\""
-        echo ""
-        exit 1
+        echo "  export PATH=\"
     fi
 }
 
@@ -204,15 +176,15 @@ start_clauded() {
 
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --session)
+            --session) 
                 SESSION_NAME="$2"
                 shift 2
                 ;;
-            --remote)
+            --remote) 
                 REMOTE_SERVER="$2"
                 shift 2
                 ;;
-            --password)
+            --password) 
                 PASSWORD="$2"
                 shift 2
                 ;;
@@ -253,9 +225,6 @@ start_clauded() {
 main() {
     print_header
 
-    # Show environment reminder first
-    show_env_reminder
-
     # Ask for confirmation
     read -p "Continue with installation? (y/N) " -n 1 -r
     echo
@@ -273,6 +242,7 @@ main() {
 
     echo ""
     print_success "Installation complete!"
+    echo "Note: clauded will automatically install Claude Code if it's not present."
     echo ""
 
     # Ask if user wants to start clauded now
