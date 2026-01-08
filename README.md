@@ -36,7 +36,25 @@ This will:
 3. Generate a random session and password
 4. Print the browser URL to access your Claude Code
 
-### Option 2: Self-Hosted Server (Recommended)
+### Option 2: Direct Binary Download
+
+Download and run the binary directly:
+
+```bash
+# Download the binary
+wget https://github.com/friddle/claude-web-remote/releases/download/v0.2/clauded-linux-amd64
+
+# Make it executable
+chmod +x clauded-linux-amd64
+
+# Run with custom settings
+./clauded-linux-amd64 \
+  --env ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic \
+  --env ANTHROPIC_AUTH_TOKEN=helloworld \
+  --flags="--allow-dangerously-skip-permissions --dangerously-skip-permissions"
+```
+
+### Option 3: Self-Hosted Server (Recommended)
 
 For better security and control, deploy your own server:
 
@@ -71,6 +89,10 @@ When prompted, enter your password.
 **Client running example:**
 
 ![Run Client](pic/run_client.png)
+
+**tmux session example:**
+
+![tmux](pic/tmux.png)
 
 ## Usage
 
@@ -133,6 +155,10 @@ clauded --remote=myserver.com --session=my-session --password=mypass \
 clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=gemini
 ```
+
+**Gemini example:**
+
+![Gemini](pic/gemini.png)
 
 ### Mobile Device Access
 
