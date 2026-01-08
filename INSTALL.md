@@ -4,7 +4,7 @@
 
 ## 快速安装
 
-### 使用默认版本 (v0.1)
+### 使用默认版本 (v0.2)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/install.sh | bash

@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="${VERSION:-v0.1}"
+VERSION="${VERSION:-v0.2}"
 REPO="friddle/claude-web-remote"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 # 使用 GitHub 加速代理
