@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/inst
 
 This will:
 1. Download the `clauded` binary to `/usr/local/bin`
-2. Connect to the demo server at `clauded.friddle.me:8022`
+2. Connect to the demo server at `clauded.friddle.me`
 3. Generate a random session and password
 4. Print the browser URL to access your Claude Code
 
@@ -43,13 +43,12 @@ For better security and control, deploy your own server:
 **1. Deploy the server on your remote machine:**
 
 ```bash
-cd server
+cd cmd/server
 docker-compose up -d
 ```
 
 The server will expose:
-- Port `8022` - for client connections
-- Port `8088` - for browser access
+- Port `80` - for both client connections and browser access
 
 **2. Connect your local machine:**
 
@@ -58,13 +57,13 @@ The server will expose:
 export ANTHROPIC_API_KEY='your-key'
 
 # Start clauded
-clauded --host=your-server.com:8022 --session=my-session --password=mypass
+clauded --remote=your-server.com --session=my-session --password=mypass
 ```
 
 **3. Access in browser:**
 
 ```
-http://your-server.com:8088/my-session/
+http://your-server.com/my-session/
 ```
 
 When prompted, enter your password.
@@ -78,14 +77,14 @@ When prompted, enter your password.
 ### Basic Connection
 
 ```bash
-# Local testing
-clauded --host=localhost:8022 --session=my-session --password=mypass
+# Local testing (if server is running locally)
+clauded --remote=http://localhost --session=my-session --password=mypass
 
 # Remote server
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=https://myserver.com --session=my-session --password=mypass
 
 # Demo server
-clauded --host=clauded.friddle.me:8022 --session=my-session --password=mypass
+clauded --remote=https://clauded.friddle.me --session=my-session --password=mypass
 ```
 
 ### Set API Key
@@ -93,26 +92,26 @@ clauded --host=clauded.friddle.me:8022 --session=my-session --password=mypass
 ```bash
 # Method 1: Environment variable
 export ANTHROPIC_API_KEY='your-key'
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 
 # Method 2: Pass via --env
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --env ANTHROPIC_API_KEY='your-key'
 
 # Method 3: Use .env file in your project directory
 echo "ANTHROPIC_API_KEY=your-key" > .env
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 ```
 
 ### Pass Flags to Claude
 
 ```bash
 # Use specific model
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --flags='--model opus'
 
 # Multiple flags
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --flags='--model opus --max-tokens 4096'
 ```
 
@@ -120,18 +119,18 @@ clauded --host=myserver.com:8022 --session=my-session --password=mypass \
 
 ```bash
 # Claude (default)
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 
 # OpenCode
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=opencode
 
 # Kimi
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=kimi
 
 # Gemini
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=gemini
 ```
 
@@ -139,9 +138,9 @@ clauded --host=myserver.com:8022 --session=my-session --password=mypass \
 
 ```bash
 # Start session on your local machine
-clauded --host=myserver.com:8022 --session=mobile --password=pass123
+clauded --remote=myserver.com --session=mobile --password=pass123
 
-# Access on your phone at: http://myserver.com:8088/mobile/
+# Access on your phone at: http://myserver.com/mobile/
 ```
 
 ### Multiple Sessions
@@ -150,13 +149,13 @@ Run multiple sessions simultaneously:
 
 ```bash
 # Terminal 1 - work session
-clauded --host=localhost:8022 --session=work --password=workpass
+clauded --remote=localhost --session=work --password=workpass
 
 # Terminal 2 - test session
-clauded --host=localhost:8022 --session=test --password=testpass
+clauded --remote=localhost --session=test --password=testpass
 
 # Terminal 3 - mobile session
-clauded --host=localhost:8022 --session=mobile --password=mobilepass
+clauded --remote=localhost --session=mobile --password=mobilepass
 ```
 
 **Web interface example:**
@@ -167,22 +166,22 @@ clauded --host=localhost:8022 --session=mobile --password=mobilepass
 
 | Parameter | Short | Default | Description |
 |----------|-------|---------|-------------|
-| `--host` | `-h` | **Required** | Server address (host:port) |
-| `--session` | `-s` | Auto-generated | Session ID for URL and auth |
-| `--password` | `-p` | Empty | Password for authentication |
-| `--codecmd` | - | claude | AI tool to use (claude, opencode, kimi, gemini) |
-| `--flags` | `-f` | Empty | Flags to pass to codecmd |
-| `--env` | `-e` | Empty | Environment variables (repeatable) |
+| `--remote` | - | `https://clauded.friddle.me` | Server address (URL or host:port) |
+| `--session` | - | Auto-generated | Session ID for URL and auth |
+| `--password` | - | Empty | Password for authentication |
+| `--codecmd` | - | `claude` | AI tool to use (claude, opencode, kimi, gemini) |
+| `--flags` | - | Empty | Flags to pass to codecmd |
+| `--env` | - | Empty | Environment variables (repeatable) |
+| `--daemon` | `-d` | `true` | Run as daemon in background |
 
 ## Troubleshooting
 
 ### Connection Failed
 
-**Access URL:** All browser access goes through `http://your-server-ip:8088/`
+**Access URL:** All browser access goes through `http://your-server-ip/`
 
 Ensure firewall allows:
-- Port `8022` - client to server (for clauded connections)
-- Port `8088` - browser to server (default, can be modified in docker-compose.yaml)
+- Port `80` (HTTP) and `443` (HTTPS) - for both client and browser connections.
 
 ### Claude Command Not Found
 
@@ -191,7 +190,7 @@ ClauDED automatically finds:
 - `claude-code` in system PATH
 - `~/.local/bin/claude-code`
 
-If not found, install Claude Code first:
+If not found, it will attempt to install it automatically. You can also install it manually:
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
@@ -203,9 +202,9 @@ Your Local Machine           Remote Server              Browser (Any Device)
 ┌─────────────┐            ┌──────────────┐           ┌─────────────┐
 │  Claude Code│            │              │           │             │
 │             │            │  Go Server   │◄──────────│  Web Browser│
-│  clauded    │───────────►│  :8088       │           │             │
+│  clauded    │───────────►│  :80         │           │             │
 │  (gotty+    │  piko      │              │           │             │
-│   piko)     │  :8022     │  Piko Proxy  │           │             │
+│   piko)     │  :80       │  Piko Proxy  │           │             │
 └─────────────┘            └──────────────┘           └─────────────┘
 ```
 

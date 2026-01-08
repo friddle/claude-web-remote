@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/inst
 
 这将:
 1. 下载 `clauded` 二进制文件到 `/usr/local/bin`
-2. 连接到演示服务器 `clauded.friddle.me:8022`
+2. 连接到演示服务器 `clauded.friddle.me`
 3. 生成随机的会话和密码
 4. 打印访问 Claude Code 的浏览器 URL
 
@@ -43,13 +43,12 @@ curl -fsSL https://raw.githubusercontent.com/friddle/claude-web-remote/main/inst
 **1. 在远程机器上部署服务器:**
 
 ```bash
-cd server
+cd cmd/server
 docker-compose up -d
 ```
 
 服务器将开放:
-- 端口 `8022` - 用于客户端连接
-- 端口 `8088` - 用于浏览器访问
+- 端口 `80` - 同时用于客户端连接和浏览器访问
 
 **2. 连接您的本地机器:**
 
@@ -58,13 +57,13 @@ docker-compose up -d
 export ANTHROPIC_API_KEY='your-key'
 
 # 启动 clauded
-clauded --host=your-server.com:8022 --session=my-session --password=mypass
+clauded --remote=your-server.com --session=my-session --password=mypass
 ```
 
 **3. 在浏览器中访问:**
 
 ```
-http://your-server.com:8088/my-session/
+http://your-server.com/my-session/
 ```
 
 输入密码即可访问。
@@ -78,14 +77,14 @@ http://your-server.com:8088/my-session/
 ### 基本连接
 
 ```bash
-# 本地测试
-clauded --host=localhost:8022 --session=my-session --password=mypass
+# 本地测试 (如果服务器运行在本地)
+clauded --remote=http://localhost --session=my-session --password=mypass
 
 # 远程服务器
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=https://myserver.com --session=my-session --password=mypass
 
 # 演示服务器
-clauded --host=clauded.friddle.me:8022 --session=my-session --password=mypass
+clauded --remote=https://clauded.friddle.me --session=my-session --password=mypass
 ```
 
 ### 设置 API 密钥
@@ -93,26 +92,26 @@ clauded --host=clauded.friddle.me:8022 --session=my-session --password=mypass
 ```bash
 # 方法 1: 环境变量
 export ANTHROPIC_API_KEY='your-key'
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 
 # 方法 2: 通过 --env 传递
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --env ANTHROPIC_API_KEY='your-key'
 
 # 方法 3: 在项目目录中使用 .env 文件
 echo "ANTHROPIC_API_KEY=your-key" > .env
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 ```
 
 ### 传递参数给 Claude
 
 ```bash
 # 使用特定模型
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --flags='--model opus'
 
 # 多个参数
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --flags='--model opus --max-tokens 4096'
 ```
 
@@ -120,18 +119,18 @@ clauded --host=myserver.com:8022 --session=my-session --password=mypass \
 
 ```bash
 # Claude (默认)
-clauded --host=myserver.com:8022 --session=my-session --password=mypass
+clauded --remote=myserver.com --session=my-session --password=mypass
 
 # OpenCode
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=opencode
 
 # Kimi
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=kimi
 
 # Gemini
-clauded --host=myserver.com:8022 --session=my-session --password=mypass \
+clauded --remote=myserver.com --session=my-session --password=mypass \
   --codecmd=gemini
 ```
 
@@ -139,9 +138,9 @@ clauded --host=myserver.com:8022 --session=my-session --password=mypass \
 
 ```bash
 # 在本地机器上启动会话
-clauded --host=myserver.com:8022 --session=mobile --password=pass123
+clauded --remote=myserver.com --session=mobile --password=pass123
 
-# 在手机上访问: http://myserver.com:8088/mobile/
+# 在手机上访问: http://myserver.com/mobile/
 ```
 
 ### 多会话
@@ -150,13 +149,13 @@ clauded --host=myserver.com:8022 --session=mobile --password=pass123
 
 ```bash
 # 终端 1 - 工作会话
-clauded --host=localhost:8022 --session=work --password=workpass
+clauded --remote=localhost --session=work --password=workpass
 
 # 终端 2 - 测试会话
-clauded --host=localhost:8022 --session=test --password=testpass
+clauded --remote=localhost --session=test --password=testpass
 
 # 终端 3 - 移动会话
-clauded --host=localhost:8022 --session=mobile --password=mobilepass
+clauded --remote=localhost --session=mobile --password=mobilepass
 ```
 
 **Web 界面示例:**
@@ -167,22 +166,22 @@ clauded --host=localhost:8022 --session=mobile --password=mobilepass
 
 | 参数 | 简写 | 默认值 | 描述 |
 |----------|-------|---------|-------------|
-| `--host` | `-h` | **必需** | 服务器地址 (host:port) |
-| `--session` | `-s` | 自动生成 | URL 和认证的会话 ID |
-| `--password` | `-p` | 空 | 认证密码 |
-| `--codecmd` | - | claude | AI 工具 (claude, opencode, kimi, gemini) |
-| `--flags` | `-f` | 空 | 传递给 codecmd 的参数 |
-| `--env` | `-e` | 空 | 环境变量 (可重复) |
+| `--remote` | - | `https://clauded.friddle.me` | 服务器地址 (URL 或 host:port) |
+| `--session` | - | 自动生成 | URL 和认证的会话 ID |
+| `--password` | - | 空 | 认证密码 |
+| `--codecmd` | - | `claude` | AI 工具 (claude, opencode, kimi, gemini) |
+| `--flags` | - | 空 | 传递给 codecmd 的参数 |
+| `--env` | - | 空 | 环境变量 (可重复) |
+| `--daemon` | `-d` | `true` | 是否以后台守护进程模式运行 |
 
 ## 故障排除
 
 ### 连接失败
 
-**访问地址:** 所有浏览器访问统一使用 `http://服务器IP:8088/`
+**访问地址:** 所有浏览器访问统一使用 `http://服务器IP/`
 
 确保防火墙允许:
-- 端口 `8022` - 客户端到服务器（用于 clauded 连接）
-- 端口 `8088` - 浏览器到服务器（默认端口，可在 docker-compose.yaml 中修改）
+- 端口 `80` (HTTP) 和 `443` (HTTPS) - 同时用于客户端和浏览器连接。
 
 ### 找不到 Claude 命令
 
@@ -191,7 +190,7 @@ ClauDED 会自动查找:
 - 系统路径中的 `claude-code`
 - `~/.local/bin/claude-code`
 
-如果找不到，先安装 Claude Code:
+如果找不到，程序会自动尝试安装。您也可以手动安装:
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
@@ -203,9 +202,9 @@ npm install -g @anthropic-ai/claude-code
 ┌─────────────┐            ┌──────────────┐           ┌─────────────┐
 │  Claude Code│            │              │           │             │
 │             │            │  Go Server   │◄──────────│  Web Browser│
-│  clauded    │───────────►│  :8088       │           │             │
+│  clauded    │───────────►│  :80         │           │             │
 │  (gotty+    │  piko      │              │           │             │
-│   piko)     │  :8022     │  Piko Proxy  │           │             │
+│   piko)     │  :80       │  Piko Proxy  │           │             │
 └─────────────┘            └──────────────┘           └─────────────┘
 ```
 
