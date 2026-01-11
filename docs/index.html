@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClauDED - Claude Code Remote Web Access</title>
+    <title>Claude Web Remote - Claude Code Remote Web Access</title>
     <style>
         * {
             margin: 0;
@@ -130,7 +130,7 @@
 <body>
     <header>
         <div class="container">
-            <h1>ClauDED</h1>
+            <h1>Claude Web Remote</h1>
             <p>Expose your local Claude Code through web terminal anywhere</p>
             <p style="margin-top: 20px; font-size: 0.9em;">
                 <a href="https://github.com/friddle/claude-web-remote" style="color: white; text-decoration: underline;">View on GitHub</a>
@@ -286,28 +286,10 @@ Your Local Machine           Remote Server              Browser (Any Device)
 └─────────────┘            └──────────────┘           └─────────────┘
             </pre>
         </div>
-
-        <div class="section">
-            <h2>Troubleshooting</h2>
-
-            <h3>Connection Failed</h3>
-            <p><strong>Access URL:</strong> All browser access goes through <code>http://your-server-ip/</code></p>
-            <p>Ensure firewall allows port <code>80</code> (HTTP) and <code>443</code> (HTTPS) for both client and browser connections.</p>
-
-            <h3>Claude Command Not Found</h3>
-            <p>ClauDED automatically finds:</p>
-            <ul>
-                <li><code>claude</code> in system PATH</li>
-                <li><code>claude</code> in <code>/usr/local/bin</code></li>
-                <li><code>claude</code> in <code>~/.local/bin</code></li>
-            </ul>
-            <p>If not found, it will attempt to install it automatically. You can also install it manually:</p>
-            <pre><code>npm install -g @anthropic-ai/claude-code</code></pre>
-        </div>
     </div>
 
     <footer>
-        <p>&copy; 2025 ClauDED. Released under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+        <p>&copy; 2025 Claude Web Remote. Released under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
         <p>
             <a href="https://github.com/friddle/claude-web-remote">GitHub</a> |
             <a href="https://github.com/friddle/claude-web-remote/issues">Issues</a> |
