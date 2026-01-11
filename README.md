@@ -213,8 +213,6 @@ Ensure firewall allows:
 
 claude for remote automatically finds:
 - `claude` in system PATH
-- `claude-code` in system PATH
-- `~/.local/bin/claude-code`
 
 If not found, it will attempt to install it automatically. You can also install it manually:
 ```bash
