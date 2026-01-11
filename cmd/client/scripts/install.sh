@@ -134,15 +134,27 @@ install_nodejs() {
 install_claude_code() {
     local use_mirror=$1
 
-    log_info "Checking claude-code installation status..."
+    log_info "Checking claude installation status..."
 
-    if command_exists claude-code; then
-        local claude_version=$(claude-code --version 2>/dev/null || echo "unknown")
-        log_info "claude-code is already installed: $claude_version"
+    # Check for claude in common paths
+    if command_exists claude; then
+        local claude_version=$(claude --version 2>/dev/null || echo "unknown")
+        log_info "claude is already installed: $claude_version"
         return 0
     fi
 
-    log_warn "claude-code is not installed, starting installation..."
+    # Also check global npm paths when running as root
+    if [ "$EUID" -eq 0 ]; then
+        export PATH="/usr/local/bin:/usr/bin:$PATH"
+        hash -r 2>/dev/null || true
+        if command_exists claude; then
+            local claude_version=$(claude --version 2>/dev/null || echo "unknown")
+            log_info "claude is already installed: $claude_version"
+            return 0
+        fi
+    fi
+
+    log_warn "claude is not installed, starting installation..."
 
     # Configure npm to use user directory if not root
     if [ "$EUID" -ne 0 ]; then
@@ -169,15 +181,27 @@ install_claude_code() {
     fi
 
     # Install using npm globally
-    log_info "Installing claude-code via npm..."
+    log_info "Installing claude via npm..."
     log_info "npm location: $(which npm)"
     npm install -g @anthropic-ai/claude-code
 
-    if command_exists claude-code; then
-        log_info "claude-code installation successful: $(claude-code --version 2>/dev/null || echo "installed")"
+    # Verify installation
+    # Add common npm global bin paths to PATH for verification
+    if [ "$EUID" -eq 0 ]; then
+        export PATH="/usr/local/bin:/usr/bin:$PATH"
+    else
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+    hash -r 2>/dev/null || true
+
+    if command_exists claude; then
+        log_info "claude installation successful: $(claude --version 2>/dev/null || echo "installed")"
         return 0
     else
-        log_error "claude-code installation failed"
+        log_error "claude installation failed"
+        log_error "PATH: $PATH"
+        log_error "which claude: $(which claude 2>/dev/null || echo 'not found')"
+        log_error "ls /usr/local/bin/claude: $(ls -la /usr/local/bin/claude 2>/dev/null || echo 'not found')"
         return 1
     fi
 }
@@ -247,12 +271,12 @@ main() {
 
     # Install claude-code
     if ! install_claude_code $use_mirror; then
-        log_error "claude-code installation failed"
+        log_error "claude installation failed"
         exit 1
     fi
 
     log_info "✅ Claude Code installation completed!"
-    log_info "You can now use 'claude-code' command to start Claude Code"
+    log_info "You can now use 'claude' command to start Claude Code"
 }
 
 # Run main flow

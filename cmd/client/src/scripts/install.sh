@@ -214,10 +214,22 @@ install_claude_code() {
 
     log_info "Checking claude installation status..."
 
+    # Check for claude in common paths
     if command_exists claude; then
         local claude_version=$(claude --version 2>/dev/null || echo "unknown")
         log_info "claude is already installed: $claude_version"
         return 0
+    fi
+
+    # Also check global npm paths when running as root
+    if check_root; then
+        export PATH="/usr/local/bin:/usr/bin:$PATH"
+        hash -r 2>/dev/null || true
+        if command_exists claude; then
+            local claude_version=$(claude --version 2>/dev/null || echo "unknown")
+            log_info "claude is already installed: $claude_version"
+            return 0
+        fi
     fi
 
     log_warn "claude is not installed, starting installation..."
@@ -262,12 +274,22 @@ install_claude_code() {
     fi
 
     # Verify installation
-    export PATH="$INSTALL_DIR:$PATH"
+    # Add common npm global bin paths to PATH for verification
+    if check_root; then
+        export PATH="/usr/local/bin:/usr/bin:$PATH"
+    else
+        export PATH="$INSTALL_DIR:$PATH"
+    fi
+    hash -r 2>/dev/null || true
+
     if command_exists claude; then
         log_info "claude installation successful: $(claude --version 2>/dev/null || echo "installed")"
         return 0
     else
         log_error "claude installation failed"
+        log_error "PATH: $PATH"
+        log_error "which claude: $(which claude 2>/dev/null || echo 'not found')"
+        log_error "ls /usr/local/bin/claude: $(ls -la /usr/local/bin/claude 2>/dev/null || echo 'not found')"
         return 1
     fi
 }
