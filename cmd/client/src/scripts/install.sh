@@ -89,6 +89,16 @@ command_exists() {
 # Configure npm to use Aliyun mirror (for China network environment)
 configure_npm_mirror() {
     log_info "Configuring npm registry..."
+
+    # Ensure npm is in PATH
+    export PATH="/usr/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+    hash -r 2>/dev/null || true
+
+    if ! command -v npm >/dev/null 2>&1; then
+        log_warn "npm not found, skipping npm registry configuration"
+        return 0
+    fi
+
     npm config set registry https://registry.npmmirror.com
     log_info "npm registry set to Aliyun mirror"
 }
@@ -202,15 +212,15 @@ install_nodejs() {
 install_claude_code() {
     local use_mirror=$1
 
-    log_info "Checking claude-code installation status..."
+    log_info "Checking claude installation status..."
 
-    if command_exists claude-code; then
-        local claude_version=$(claude-code --version 2>/dev/null || echo "unknown")
-        log_info "claude-code is already installed: $claude_version"
+    if command_exists claude; then
+        local claude_version=$(claude --version 2>/dev/null || echo "unknown")
+        log_info "claude is already installed: $claude_version"
         return 0
     fi
 
-    log_warn "claude-code is not installed, starting installation..."
+    log_warn "claude is not installed, starting installation..."
 
     # Check if running as root
     if ! check_root; then
@@ -224,8 +234,21 @@ install_claude_code() {
         configure_npm_mirror
     fi
 
+    # Ensure npm is visible in PATH after installation
+    export PATH="/usr/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+    hash -r 2>/dev/null || true
+
+    # Verify npm is available
+    if ! command -v npm >/dev/null 2>&1; then
+        log_error "npm command not found after Node.js installation"
+        log_error "Node.js path: $(which node 2>/dev/null || echo 'not found')"
+        log_error "Please ensure npm is properly installed with Node.js"
+        return 1
+    fi
+
     # Install using npm
-    log_info "Installing claude-code via npm..."
+    log_info "Installing claude via npm..."
+    log_info "npm location: $(which npm)"
     if check_root; then
         npm install -g @anthropic-ai/claude-code
     else
@@ -233,17 +256,18 @@ install_claude_code() {
         npm install --prefix "$HOME/.local" @anthropic-ai/claude-code
 
         # Create symlink in ~/.local/bin
-        ln -sf "$HOME/.local/lib/node_modules/@anthropic-ai/claude-code/bin/claude-code.js" "$INSTALL_DIR/claude-code"
-        chmod +x "$INSTALL_DIR/claude-code"
+        # The npm package installs the 'claude' command
+        ln -sf "$HOME/.local/lib/node_modules/@anthropic-ai/claude-code/bin/claude.js" "$INSTALL_DIR/claude"
+        chmod +x "$INSTALL_DIR/claude"
     fi
 
     # Verify installation
     export PATH="$INSTALL_DIR:$PATH"
-    if command_exists claude-code; then
-        log_info "claude-code installation successful: $(claude-code --version 2>/dev/null || echo "installed")"
+    if command_exists claude; then
+        log_info "claude installation successful: $(claude --version 2>/dev/null || echo "installed")"
         return 0
     else
-        log_error "claude-code installation failed"
+        log_error "claude installation failed"
         return 1
     fi
 }
@@ -312,12 +336,12 @@ main() {
 
     # Install claude-code
     if ! install_claude_code $use_mirror; then
-        log_error "claude-code installation failed"
+        log_error "claude installation failed"
         exit 1
     fi
 
     log_info "✅ Claude Code installation completed!"
-    log_info "You can now use 'claude-code' command to start Claude Code"
+    log_info "You can now use 'claude' command to start Claude Code"
 }
 
 # Run main flow

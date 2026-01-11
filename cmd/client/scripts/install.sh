@@ -57,6 +57,16 @@ command_exists() {
 # Configure npm to use Aliyun mirror (for China network environment)
 configure_npm_mirror() {
     log_info "Configuring npm registry..."
+
+    # Ensure npm is in PATH
+    export PATH="/usr/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+    hash -r 2>/dev/null || true
+
+    if ! command -v npm >/dev/null 2>&1; then
+        log_warn "npm not found, skipping npm registry configuration"
+        return 0
+    fi
+
     npm config set registry https://registry.npmmirror.com
     log_info "npm registry set to Aliyun mirror"
 }
@@ -146,8 +156,21 @@ install_claude_code() {
         configure_npm_mirror
     fi
 
+    # Ensure npm is visible in PATH after installation
+    export PATH="/usr/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+    hash -r 2>/dev/null || true
+
+    # Verify npm is available
+    if ! command -v npm >/dev/null 2>&1; then
+        log_error "npm command not found after Node.js installation"
+        log_error "Node.js path: $(which node 2>/dev/null || echo 'not found')"
+        log_error "Please ensure npm is properly installed with Node.js"
+        return 1
+    fi
+
     # Install using npm globally
     log_info "Installing claude-code via npm..."
+    log_info "npm location: $(which npm)"
     npm install -g @anthropic-ai/claude-code
 
     if command_exists claude-code; then
