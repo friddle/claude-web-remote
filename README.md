@@ -1,4 +1,4 @@
-# ClauDED
+# claude for remote
 
 > Expose your local Claude Code through web terminal anywhere - perfect for remote access and mobile devices.
 
@@ -211,7 +211,7 @@ Ensure firewall allows:
 
 ### Claude Command Not Found
 
-ClauDED automatically finds:
+claude for remote automatically finds:
 - `claude` in system PATH
 - `claude-code` in system PATH
 - `~/.local/bin/claude-code`
