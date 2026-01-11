@@ -103,7 +103,13 @@ func runServe(session, password, codeCmd, remote, flags string, envVars []string
 		if !installer.IsClaudeCodeInstalled() {
 			fmt.Println("claude-code not found, starting automatic installation...")
 			if err := installer.Install(); err != nil {
-				return fmt.Errorf("failed to install claude-code: %w", err)
+				// Only log warning on verification failure, don't exit
+				// The installation may have succeeded but PATH isn't updated yet
+				fmt.Printf("⚠️  Warning: %v\n", err)
+				fmt.Println("⚠️  The installation may have succeeded, but verification failed.")
+				fmt.Println("⚠️  If claude-code was installed, you can try running with --skip-install-check flag")
+				fmt.Println("⚠️  Or restart your terminal and run clauded again")
+				// Don't return error - continue execution
 			}
 		}
 	}

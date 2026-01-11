@@ -130,7 +130,7 @@ install_nodejs() {
     log_info "Node.js installation completed: $(node --version)"
 }
 
-# Install claude-code
+# Install claude
 install_claude_code() {
     local use_mirror=$1
 
@@ -185,14 +185,23 @@ install_claude_code() {
     log_info "npm location: $(which npm)"
     npm install -g @anthropic-ai/claude-code
 
-    # Verify installation
-    # Add common npm global bin paths to PATH for verification
+    # Create symlink from claude-code to claude if it doesn't exist
     if [ "$EUID" -eq 0 ]; then
         export PATH="/usr/local/bin:/usr/bin:$PATH"
     else
         export PATH="$HOME/.local/bin:$PATH"
     fi
     hash -r 2>/dev/null || true
+
+    # Try to find where claude-code was installed and create symlink
+    if command_exists claude-code; then
+        CLAUDE_CODE_PATH=$(which claude-code)
+        CLAUDE_DIR=$(dirname "$CLAUDE_CODE_PATH")
+        if [ ! -e "$CLAUDE_DIR/claude" ]; then
+            ln -s "$CLAUDE_CODE_PATH" "$CLAUDE_DIR/claude"
+            log_info "Created symlink from claude-code to claude"
+        fi
+    fi
 
     if command_exists claude; then
         log_info "claude installation successful: $(claude --version 2>/dev/null || echo "installed")"
