@@ -1,192 +1,260 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { BackgroundTask } from '@capacitor/background-task';
 
-class ClaudeDApp {
+const APP_KEY_SESSIONS = 'clauded_sessions';
+
+class App {
     constructor() {
-        this.connected = false;
-        this.sessionId = null;
-        this.webhookUrl = null;
-        this.notifications = [];
+        this.sessions = JSON.parse(localStorage.getItem(APP_KEY_SESSIONS) || '[]');
+        this.currentSession = null;
     }
 
-    async init() {
-        // Request notification permissions
-        await this.requestNotificationPermission();
+    init() {
+        this.renderSessionList();
+        this.setupEventListeners();
 
-        // Setup form handler
-        document.getElementById('connectForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.connect();
+        // Request notification permission on load
+        this.requestNotificationPermission();
+    }
+
+    setupEventListeners() {
+        // Modal toggles
+        const btnAdd = document.getElementById('btnAddSession');
+        if (btnAdd) {
+            btnAdd.addEventListener('click', () => this.showModal('modalAdd'));
+        }
+
+        const btnCancel = document.getElementById('btnCancelAdd');
+        if (btnCancel) {
+            btnCancel.addEventListener('click', () => this.hideModal('modalAdd'));
+        }
+
+        // Add Session Form
+        const formAdd = document.getElementById('formAddSession');
+        if (formAdd) {
+            formAdd.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.addSession();
+            });
+        }
+
+        // Back button in session view
+        const btnBack = document.getElementById('btnBack');
+        if (btnBack) {
+            btnBack.addEventListener('click', () => this.closeSession());
+        }
+
+        // Tab Bar
+        document.querySelectorAll('.tab-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const tab = item.dataset.tab;
+                this.switchTab(tab);
+            });
         });
-
-        // Load saved credentials
-        this.loadCredentials();
     }
 
     async requestNotificationPermission() {
         try {
-            const result = await LocalNotifications.requestPermissions();
-            console.log('Notification permissions:', result);
-        } catch (error) {
-            console.error('Failed to request notification permission:', error);
+            await LocalNotifications.requestPermissions();
+        } catch (e) {
+            console.error('Notification permission error:', e);
         }
     }
 
-    loadCredentials() {
-        const host = localStorage.getItem('clauded_host');
-        const session = localStorage.getItem('clauded_session');
-        const password = localStorage.getItem('clauded_password');
+    // --- Session Management ---
 
-        if (host) document.getElementById('host').value = host;
-        if (session) document.getElementById('session').value = session;
-        if (password) document.getElementById('password').value = password;
-    }
+    addSession() {
+        const name = document.getElementById('inputName').value;
+        const host = document.getElementById('inputHost').value;
+        const sessionId = document.getElementById('inputSession').value;
+        const password = document.getElementById('inputPassword').value;
 
-    saveCredentials(host, session, password) {
-        localStorage.setItem('clauded_host', host);
-        localStorage.setItem('clauded_session', session);
-        localStorage.setItem('clauded_password', password);
-    }
-
-    async connect() {
-        const host = document.getElementById('host').value;
-        const session = document.getElementById('session').value;
-        const password = document.getElementById('password').value;
-
-        // Save credentials
-        this.saveCredentials(host, session, password);
-
-        try {
-            // Subscribe to notifications via SSE
-            this.connectToNotificationStream(host, session);
-
-            this.sessionId = session;
-            this.connected = true;
-
-            this.showStatus('Connected successfully!', 'connected');
-
-            // Open WebView to terminal
-            this.openTerminal(host, session, password);
-
-        } catch (error) {
-            console.error('Connection failed:', error);
-            this.showStatus('Connection failed: ' + error.message, 'error');
-        }
-    }
-
-    connectToNotificationStream(host, session) {
-        // Use SSE for notifications
-        const url = `https://${host}/api/v1/notifications/stream?session_id=${session}`;
-        console.log('Connecting to SSE:', url);
-
-        if (this.eventSource) {
-            this.eventSource.close();
-        }
-
-        this.eventSource = new EventSource(url);
-
-        this.eventSource.onopen = () => {
-            console.log('SSE connected');
+        const newSession = {
+            id: Date.now().toString(),
+            name,
+            host,
+            sessionId,
+            password,
+            createdAt: new Date().toISOString()
         };
 
-        this.eventSource.onerror = (err) => {
-            console.error('SSE error:', err);
-            // Optional: Try to reconnect after delay
-        };
+        this.sessions.push(newSession);
+        this.saveSessions();
+        this.renderSessionList();
+        this.hideModal('modalAdd');
 
-        // Listen for specific events
-        // Assuming the server sends events with type 'message' or custom types
-        // The server code sends: c.SSEvent(string(notif.Type), string(data))
-        
-        // Listen for all standard notification types
-        const eventTypes = ['task_completed', 'error', 'progress', 'system_status'];
-        
-        eventTypes.forEach(type => {
-            this.eventSource.addEventListener(type, (e) => {
-                try {
-                    const data = JSON.parse(e.data);
-                    this.handleNotification(data);
-                } catch (err) {
-                    console.error('Failed to parse notification:', err);
-                }
-            });
-        });
-        
-        // Also listen for generic messages just in case
-        this.eventSource.onmessage = (e) => {
-             try {
-                const data = JSON.parse(e.data);
-                this.handleNotification(data);
-            } catch (err) {
-                // If it's not JSON, might be a keep-alive or raw string
-            }
-        };
-    }
-    
-    handleNotification(notif) {
-        console.log('Received notification:', notif);
-        // Map server notification structure to app structure if needed
-        // Server sends: { Type, Title, Message, Data, Timestamp }
-        
-        this.showNotification(notif.Title || 'Notification', notif.Message || '', notif);
+        // Clear form
+        document.getElementById('formAddSession').reset();
+        document.getElementById('inputHost').value = 'clauded.friddle.me'; // Restore default
     }
 
-    openTerminal(host, session, password) {
-        // Open browser with terminal
-        const url = `https://${session}:${password}@${host}/${session}`;
-        window.open(url, '_blank');
+    saveSessions() {
+        localStorage.setItem(APP_KEY_SESSIONS, JSON.stringify(this.sessions));
     }
 
-    showNotification(title, body, data = {}) {
-        // Add to notifications list
-        this.notifications.unshift({
-            title,
-            body,
-            data,
-            time: new Date().toLocaleString()
-        });
+    deleteSession(id, event) {
+        if (event) event.stopPropagation();
+        if (!confirm('Are you sure you want to delete this session?')) return;
 
-        this.renderNotifications();
-
-        // Show system notification
-        LocalNotifications.schedule({
-            notifications: [
-                {
-                    id: Date.now(),
-                    title,
-                    body,
-                    sound: 'default',
-                    schedule: { at: new Date() }
-                }
-            ]
-        });
+        this.sessions = this.sessions.filter(s => s.id !== id);
+        this.saveSessions();
+        this.renderSessionList();
     }
 
-    renderNotifications() {
-        const container = document.getElementById('notifications');
+    renderSessionList() {
+        const list = document.getElementById('sessionList');
+        if (!list) return;
 
-        if (this.notifications.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #6c757d;">No notifications yet</p>';
+        list.innerHTML = '';
+
+        if (this.sessions.length === 0) {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <div style="font-size: 40px; margin-bottom: 10px;">💬</div>
+                    <p>No sessions yet.</p>
+                    <p>Click + to add one.</p>
+                </div>
+            `;
             return;
         }
 
-        container.innerHTML = this.notifications.map(notif => `
-            <div class="notification-item ${notif.data.type === 'error' ? 'error' : ''}">
-                <div class="notification-time">${notif.time}</div>
-                <div><strong>${notif.title}</strong></div>
-                <div>${notif.body}</div>
-            </div>
-        `).join('');
+        this.sessions.forEach(session => {
+            const item = document.createElement('div');
+            item.className = 'session-item';
+            item.innerHTML = `
+                <div class="session-icon">
+                    <span>>_</span>
+                </div>
+                <div class="session-info">
+                    <div class="session-name">${this.escapeHtml(session.name)}</div>
+                    <div class="session-detail">${this.escapeHtml(session.host)} / ${this.escapeHtml(session.sessionId)}</div>
+                </div>
+            `;
+
+            // Long press to delete could be better, but let's just click to open
+            item.addEventListener('click', () => this.openSession(session));
+
+            list.appendChild(item);
+        });
     }
 
-    showStatus(message, type) {
-        const statusEl = document.getElementById('status');
-        statusEl.textContent = message;
-        statusEl.className = `status ${type}`;
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // --- View Management ---
+
+    openSession(session) {
+        this.currentSession = session;
+
+        const title = document.getElementById('sessionTitle');
+        if (title) title.textContent = session.name;
+
+        const frame = document.getElementById('terminalFrame');
+        if (frame) {
+            // Construct URL: https://session:password@host/session
+            // Or if host is just domain: https://domain/session
+            // The logic from previous app.js: `https://${session}:${password}@${host}/${session}`
+
+            // Handle host having protocol or not
+            let host = session.host;
+            let protocol = 'https://';
+            if (host.startsWith('http://') || host.startsWith('https://')) {
+                // simple parsing
+                if (host.startsWith('http://')) {
+                    protocol = 'http://';
+                    host = host.substring(7);
+                } else {
+                    host = host.substring(8);
+                }
+            }
+
+            // Construct auth URL
+            const url = `${protocol}${session.sessionId}:${session.password}@${host}/${session.sessionId}`;
+            console.log('Opening session URL:', url);
+            frame.src = url;
+        }
+
+        this.showView('view-session');
+    }
+
+    closeSession() {
+        this.currentSession = null;
+        const frame = document.getElementById('terminalFrame');
+        if (frame) {
+            frame.src = 'about:blank';
+        }
+        this.showView('view-home');
+    }
+
+    showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const view = document.getElementById(viewId);
+        if (view) view.classList.add('active');
+    }
+
+    showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.add('active');
+    }
+
+    hideModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.remove('active');
+    }
+
+    switchTab(tab) {
+        document.querySelectorAll('.tab-item').forEach(t => {
+            if (t.dataset.tab === tab) t.classList.add('active');
+            else t.classList.remove('active');
+        });
+
+        if (tab === 'home') {
+            // Logic for home tab
+        } else if (tab === 'settings') {
+            // Logic for settings tab
+            alert('Settings not implemented yet');
+        }
+    }
+
+    // --- Tmux Controls ---
+
+    sendTmux(action) {
+        if (!this.currentSession) return;
+
+        console.log('Sending Tmux Action:', action);
+
+        // NOTE: This is a simulation/placeholder.
+        // Sending actual keys to the iframe requires the iframe to be on the same origin
+        // or the server to expose a specific API for input injection.
+        // Assuming Gotty running on the server might capture these if we use a specific API.
+
+        // If we were using a native terminal plugin, we would write to the PTY here.
+
+        // For now, we'll try to use a hypothetical API endpoint if it existed,
+        // or just show feedback to the user.
+
+        const feedback = document.createElement('div');
+        feedback.style.position = 'fixed';
+        feedback.style.top = '50%';
+        feedback.style.left = '50%';
+        feedback.style.transform = 'translate(-50%, -50%)';
+        feedback.style.background = 'rgba(0,0,0,0.7)';
+        feedback.style.color = 'white';
+        feedback.style.padding = '10px 20px';
+        feedback.style.borderRadius = '8px';
+        feedback.style.zIndex = '2000';
+        feedback.textContent = `Tmux: ${action}`;
+        document.body.appendChild(feedback);
+
+        setTimeout(() => feedback.remove(), 1000);
     }
 }
 
-// Initialize app
-const app = new ClaudeDApp();
+// Initialize
+const app = new App();
+window.app = app; // Expose for inline handlers
 document.addEventListener('DOMContentLoaded', () => app.init());

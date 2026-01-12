@@ -2,178 +2,386 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ClaudeD Remote</title>
     <style>
+        :root {
+            --primary-color: #07C160;
+            --bg-color: #EDEDED;
+            --card-bg: #FFFFFF;
+            --text-primary: #111111;
+            --text-secondary: #7F7F7F;
+            --divider-color: #D9D9D9;
+            --safe-area-top: env(safe-area-inset-top);
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
+        /* Views */
+        .view {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
         }
 
-        h1 {
+        .view.active {
+            display: flex;
+        }
+
+        /* Navigation Bar */
+        .navbar {
+            height: calc(44px + var(--safe-area-top));
+            background-color: var(--bg-color);
+            padding-top: var(--safe-area-top);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-left: 16px;
+            padding-right: 16px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            z-index: 100;
+        }
+
+        .navbar h1 {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-primary);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Session List */
+        .session-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            background-color: var(--card-bg);
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--divider-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .session-item:active {
+            background-color: #F0F0F0;
+        }
+
+        .session-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--primary-color);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
+            font-size: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
         }
 
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
+        .session-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .session-name {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .session-detail {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            align-items: flex-end; /* Slide up from bottom style */
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            width: 100%;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            padding: 0;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--divider-color);
+        }
+
+        .modal-body {
+            padding: 20px;
         }
 
         .form-group {
             margin-bottom: 20px;
         }
 
-        label {
+        .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 14px;
         }
 
-        input {
+        .form-group input {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            border: none;
+            background-color: var(--card-bg);
+            border-radius: 8px;
             font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #667eea;
         }
 
         .btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
+            margin-bottom: 12px;
         }
 
-        .btn:active {
-            transform: scale(0.98);
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
         }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        .btn-cancel {
+            background-color: #FFFFFF;
+            color: var(--text-primary);
         }
 
-        .status {
-            text-align: center;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
+        /* Active Session View */
+        .session-view {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
-        .status.connected {
-            background: #d4edda;
-            color: #155724;
-            display: block;
+        .terminal-container {
+            flex: 1;
+            background-color: #000;
+            position: relative;
         }
 
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            display: block;
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
         }
 
-        .notifications {
-            background: #f8f9fa;
-            border-radius: 6px;
-            padding: 16px;
-            max-height: 200px;
-            overflow-y: auto;
+        /* Quick Nav / Tmux Controls */
+        .quick-nav {
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            border-top: 1px solid rgba(0,0,0,0.1);
         }
 
-        .notification-item {
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            border-left: 4px solid #667eea;
-        }
-
-        .notification-item.error {
-            border-left-color: #dc3545;
-        }
-
-        .notification-time {
-            font-size: 12px;
-            color: #6c757d;
-            margin-bottom: 4px;
-        }
-
-        .webhook-info {
+        .quick-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
             font-size: 14px;
-            color: #6c757d;
-            margin-top: 10px;
+            font-weight: 500;
+            color: var(--text-primary);
+            border-radius: 4px;
         }
+
+        .quick-btn:active {
+            background-color: rgba(0,0,0,0.05);
+        }
+
+        /* Bottom Tab Bar */
+        .tab-bar {
+            height: calc(50px + var(--safe-area-bottom));
+            background-color: #F7F7F7;
+            border-top: 1px solid var(--divider-color);
+            display: flex;
+            padding-bottom: var(--safe-area-bottom);
+        }
+
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .tab-item.active {
+            color: var(--primary-color);
+        }
+
+        .tab-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+
+        /* Icons (Simple SVG) */
+        .icon-chat::before { content: "💬"; }
+        .icon-settings::before { content: "⚙️"; }
+        .icon-plus::before { content: "+"; }
+        .icon-close::before { content: "✕"; }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🤖 ClaudeD Remote</h1>
 
-        <div id="status" class="status"></div>
-
-        <div class="card">
-            <form id="connectForm">
-                <div class="form-group">
-                    <label for="host">Host</label>
-                    <input type="text" id="host" value="clauded.friddle.me" placeholder="clauded.friddle.me" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="session">Session ID</label>
-                    <input type="text" id="session" placeholder="Your session ID" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="Your password" required>
-                </div>
-
-                <button type="submit" class="btn">Connect to Claude Code</button>
-            </form>
-
-            <div class="webhook-info">
-                💡 Webhook server will start on port 8080
-            </div>
+    <!-- Main View (Session List) -->
+    <div id="view-home" class="view active">
+        <div class="navbar">
+            <div style="width: 40px;"></div> <!-- Spacer -->
+            <h1>ClaudeD</h1>
+            <button class="nav-btn" id="btnAddSession">
+                <span class="icon-plus"></span>
+            </button>
         </div>
 
-        <div class="card">
-            <h3>Notifications</h3>
-            <div class="notifications" id="notifications">
-                <p style="text-align: center; color: #6c757d;">No notifications yet</p>
+        <div class="session-list" id="sessionList">
+            <!-- Sessions will be injected here -->
+        </div>
+
+        <div class="tab-bar">
+            <div class="tab-item active" data-tab="home">
+                <span class="tab-icon icon-chat"></span>
+                <span>Sessions</span>
             </div>
+            <div class="tab-item" data-tab="settings">
+                <span class="tab-icon icon-settings"></span>
+                <span>Settings</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Session Modal -->
+    <div id="modalAdd" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="nav-btn" style="font-size: 16px;" id="btnCancelAdd">Cancel</button>
+                <h2 style="font-size: 17px; font-weight: 600;">Add Session</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="modal-body">
+                <form id="formAddSession">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="inputName" placeholder="e.g. My Server" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Host</label>
+                        <input type="text" id="inputHost" placeholder="clauded.friddle.me" value="clauded.friddle.me" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Session ID</label>
+                        <input type="text" id="inputSession" placeholder="Session ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="inputPassword" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Session View -->
+    <div id="view-session" class="view" style="background: black;">
+        <div class="navbar" style="background: #EDEDED;">
+            <button class="nav-btn" id="btnBack">
+                <span style="font-size: 16px;">Back</span>
+            </button>
+            <h1 id="sessionTitle">Terminal</h1>
+            <div style="width: 40px;"></div>
+        </div>
+
+        <div class="terminal-container">
+            <iframe id="terminalFrame" src=""></iframe>
+        </div>
+
+        <div class="quick-nav">
+            <button class="quick-btn" onclick="app.sendTmux('prev')">Prev</button>
+            <button class="quick-btn" onclick="app.sendTmux('next')">Next</button>
+            <button class="quick-btn" onclick="app.sendTmux('new')">New</button>
+            <button class="quick-btn" onclick="app.sendTmux('list')">List</button>
         </div>
     </div>
 
