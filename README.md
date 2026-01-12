@@ -4,6 +4,8 @@
 
 ⚠️ **Security Notice**: The quick start uses a demo server (clauded.friddle.me) for testing. For production use, we strongly recommend deploying your own self-hosted server to ensure full control over your data and security.
 
+⏰ **Auto-Exit Feature**: Sessions automatically exit after 2 days to prevent resource waste and ensure security. You can disable this with `--auto-exit=false` if needed.
+
 ## Use Cases
 
 **🌍 Remote Access**
@@ -42,7 +44,7 @@ Download and run the binary directly:
 
 ```bash
 # Download the binary
-wget https://github.com/friddle/claude-web-remote/releases/download/v0.2/clauded-linux-amd64
+wget https://github.com/friddle/claude-web-remote/releases/download/v0.3/clauded-linux-amd64
 
 # Make it executable
 chmod +x clauded-linux-amd64
@@ -137,6 +139,26 @@ clauded --remote=myserver.com --session=my-session --password=mypass \
   --flags='--model opus --max-tokens 4096'
 ```
 
+### Attach Local Ports
+
+Forward additional local ports to access them remotely:
+
+```bash
+# Forward a single port (e.g., local web server on port 3000)
+clauded --remote=myserver.com --session=my-session --password=mypass \
+  --attach-ports 3000
+
+# Forward multiple ports
+clauded --remote=myserver.com --session=my-session --password=mypass \
+  --attach-ports 3000 --attach-ports 8080 --attach-ports 5000
+```
+
+Access forwarded ports at:
+- `http://myserver.com/my-session/3000/` → forwards to `localhost:3000`
+- `http://myserver.com/my-session/8080/` → forwards to `localhost:8080`
+
+> **Note**: Port forwarding does not support authentication (username/password). Ensure your server is properly secured.
+
 ### Use Different AI Tools
 
 ```bash
@@ -194,10 +216,12 @@ clauded --remote=localhost --session=mobile --password=mobilepass
 |----------|-------|---------|-------------|
 | `--remote` | - | `https://clauded.friddle.me` | Server address (URL or host:port) |
 | `--session` | - | Auto-generated | Session ID for URL and auth |
-| `--password` | - | Empty | Password for authentication |
+| `--password` | - | Auto-generated | Password for authentication |
 | `--codecmd` | - | `claude` | AI tool to use (claude, opencode, kimi, gemini) |
 | `--flags` | - | Empty | Flags to pass to codecmd |
 | `--env` | - | Empty | Environment variables (repeatable) |
+| `--attach-ports` | - | Empty | Additional local ports to forward (repeatable) |
+| `--auto-exit` | - | `true` | Enable 2-day auto exit |
 | `--daemon` | `-d` | `true` | Run as daemon in background |
 
 ## Troubleshooting

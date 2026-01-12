@@ -25,6 +25,7 @@ func MakeMainCmd() *cobra.Command {
 		remote             string
 		flags              string
 		envVars            []string
+		attachPorts        []int
 		autoExit           bool
 		insecureSkipVerify bool
 		skipInstall        bool
@@ -38,7 +39,7 @@ func MakeMainCmd() *cobra.Command {
 through gotty and piko services to a remote server, allowing you to access and use
 Claude Code from anywhere via a web browser.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(session, password, codeCmd, remote, flags, envVars, autoExit, insecureSkipVerify, skipInstall, daemon)
+			return runServe(session, password, codeCmd, remote, flags, envVars, attachPorts, autoExit, insecureSkipVerify, skipInstall, daemon)
 		},
 	}
 
@@ -49,7 +50,8 @@ Claude Code from anywhere via a web browser.`,
 	rootCmd.Flags().StringVar(&codeCmd, "codecmd", "claude", "AI command tool to use (claude, opencode, kimi, gemini)")
 	rootCmd.Flags().StringVar(&flags, "flags", "", "Flags to pass to codecmd (e.g., '--model opus')")
 	rootCmd.Flags().StringArrayVar(&envVars, "env", []string{}, "Environment variables to pass (e.g., -e KEY=value)")
-	rootCmd.Flags().BoolVar(&autoExit, "auto-exit", true, "Enable 24-hour auto exit (default: true)")
+	rootCmd.Flags().IntSliceVar(&attachPorts, "attach-ports", []int{}, "Additional local ports to forward (e.g., --attach-ports 3000 --attach-ports 8080)")
+	rootCmd.Flags().BoolVar(&autoExit, "auto-exit", true, "Enable 2-day auto exit (default: true)")
 	rootCmd.Flags().BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "Skip HTTPS certificate verification (default: false)")
 	rootCmd.Flags().BoolVar(&skipInstall, "skip-install-check", false, "Skip claude-code installation check (default: false)")
 	rootCmd.Flags().BoolVarP(&daemon, "daemon", "d", true, "Run as daemon in background (default: true)")
@@ -96,7 +98,7 @@ Claude Code from anywhere via a web browser.`,
 	return rootCmd
 }
 
-func runServe(session, password, codeCmd, remote, flags string, envVars []string, autoExit, insecureSkipVerify, skipInstall, daemon bool) error {
+func runServe(session, password, codeCmd, remote, flags string, envVars []string, attachPorts []int, autoExit, insecureSkipVerify, skipInstall, daemon bool) error {
 	// Check and install claude-code if needed (only for claude command)
 	if !skipInstall && codeCmd == "claude" {
 		installer := src.NewInstaller()
@@ -127,6 +129,7 @@ func runServe(session, password, codeCmd, remote, flags string, envVars []string
 		CodeCmd:            codeCmd,
 		Flags:              flags,
 		EnvVars:            envVars,
+		AttachPorts:        attachPorts,
 		AutoExit:           autoExit,
 		InsecureSkipVerify: insecureSkipVerify,
 		Daemon:             daemon,

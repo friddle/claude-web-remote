@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"clauded-server/config"
@@ -60,9 +62,11 @@ func (h *Handler) SetupRoutes() *gin.Engine {
 	router.Any("/piko/*path", gin.WrapH(h.proxyManager.ProxyUpstreamRequest()))
 	router.Any("/piko", gin.WrapH(h.proxyManager.ProxyUpstreamRequest()))
 
-	// Catch-all: Proxy all other requests to piko as session-based service
-	// This handles /:session, /:session/, /:session/*path, etc.
-	router.NoRoute(gin.WrapH(h.proxyManager.ProxyRequest()))
+	// Catch-all: Proxy all other requests
+	// This intelligently handles:
+	// - /:session/:port/*path -> attached port forwarding
+	// - /:session/*path -> regular session-based service
+	router.NoRoute(h.ProxyRequest)
 
 	return router
 }
@@ -204,5 +208,27 @@ func (h *Handler) GetSubscriptions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"subscriptions": subs,
 	})
+}
+
+// ProxyRequest intelligently routes requests to either port forwarding or regular session
+func (h *Handler) ProxyRequest(c *gin.Context) {
+	path := c.Request.URL.Path
+	// Trim leading slash and split
+	path = strings.TrimPrefix(path, "/")
+	parts := strings.Split(path, "/")
+
+	// Check if this is a port forwarding request: /:session/:port/*
+	// The second segment should be a valid port number
+	if len(parts) >= 2 {
+		// Try to parse the second segment as a port number
+		if _, err := strconv.Atoi(parts[1]); err == nil {
+			// It's a valid port number, use port forwarding
+			h.proxyManager.ProxyPortRequest()(c.Writer, c.Request)
+			return
+		}
+	}
+
+	// Otherwise, use regular session proxy
+	h.proxyManager.ProxyRequest()(c.Writer, c.Request)
 }
 

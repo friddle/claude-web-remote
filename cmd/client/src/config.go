@@ -22,6 +22,7 @@ type Config struct {
 	Flags              string   `json:"flags"`              // flags to pass to claude-code
 	EnvVars            []string `json:"-"`                  // environment variables (hidden from JSON, may contain secrets)
 	GottyPort          int      `json:"port"`               // local gotty port (auto allocated)
+	AttachPorts        []int    `json:"attach_ports"`       // additional local ports to forward
 	AutoExit           bool     `json:"auto_exit"`          // enable 24-hour auto exit (default: true)
 	InsecureSkipVerify bool     `json:"insecure_skip_verify"` // skip HTTPS certificate verification
 	Daemon             bool     `json:"daemon"`             // run as daemon (background mode)
@@ -288,6 +289,11 @@ func (c *Config) ToArgs() []string {
 	// --env (multiple)
 	for _, env := range c.EnvVars {
 		args = append(args, "--env", env)
+	}
+
+	// --attach-ports (multiple)
+	for _, port := range c.AttachPorts {
+		args = append(args, "--attach-ports", fmt.Sprintf("%d", port))
 	}
 
 	// --auto-exit

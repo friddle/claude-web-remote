@@ -152,7 +152,7 @@ func (m *Manager) ProxyUpstreamRequest() http.HandlerFunc {
 			Rewrite: func(pr *httputil.ProxyRequest) {
 				// Set the target URL
 				pr.Out.URL = targetURL
-				
+
 				// Ensure path starts with /piko
 				newPath := r.URL.Path
 				if !strings.HasPrefix(newPath, "/piko") {
@@ -163,7 +163,7 @@ func (m *Manager) ProxyUpstreamRequest() http.HandlerFunc {
 						newPath = "/piko/" + newPath
 					}
 				}
-				
+
 				pr.Out.URL.Path = newPath
 				pr.Out.URL.RawQuery = r.URL.RawQuery
 
@@ -179,6 +179,83 @@ func (m *Manager) ProxyUpstreamRequest() http.HandlerFunc {
 			},
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 				log.Printf("Proxy error for upstream service: %v", err)
+				http.Error(w, "Proxy error", http.StatusBadGateway)
+			},
+		}
+
+		// Flush the response after writing to support SSE/WebSocket
+		proxy.FlushInterval = 100 * time.Millisecond
+
+		// Serve the proxy
+		proxy.ServeHTTP(w, r)
+	}
+}
+
+// ProxyPortRequest creates a handler that proxies requests for attached ports
+// This handles /:session/:port paths where port is a forwarded port
+func (m *Manager) ProxyPortRequest() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("DEBUG: ProxyPortRequest hit. URL: %s", r.URL.Path)
+
+		// Extract session ID and port from URL path
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) < 2 {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+
+		sessionID := parts[0]
+		port := parts[1]
+
+		// Validate port is numeric
+		if _, err := fmt.Sscanf(port, "%d", new(int)); err != nil {
+			http.Error(w, "Invalid port number", http.StatusBadRequest)
+			return
+		}
+
+		// Create endpoint ID: {sessionID}-{port}
+		endpointID := fmt.Sprintf("%s-%s", sessionID, port)
+
+		// Create proxy director
+		targetURL, _ := url.Parse(m.pikoProxyURL)
+		proxy := &httputil.ReverseProxy{
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				// Set the target URL
+				pr.Out.URL = targetURL
+				// Keep original path (strip /session/port prefix)
+				if len(parts) > 2 {
+					pr.Out.URL.Path = "/" + strings.Join(parts[2:], "/")
+				} else {
+					pr.Out.URL.Path = "/"
+				}
+				pr.Out.URL.RawQuery = r.URL.RawQuery
+
+				// Set piko endpoint header
+				pr.Out.Header.Set("X-Piko-Endpoint", endpointID)
+				log.Printf("DEBUG: Setting X-Piko-Endpoint header: %s", endpointID)
+
+				// Copy other headers
+				pr.Out.Header.Set("X-Forwarded-Host", r.Host)
+				pr.Out.Header.Set("X-Forwarded-Proto", scheme(r))
+
+				// Handle WebSocket upgrade
+				if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+					pr.Out.Header.Set("Upgrade", "websocket")
+					pr.Out.Header.Set("Connection", "Upgrade")
+				}
+			},
+			ModifyResponse: func(resp *http.Response) error {
+				// If Piko returns 502, it means the upstream (client) is not connected.
+				// We map this to 404 to indicate "Session Not Found".
+				if resp.StatusCode == http.StatusBadGateway {
+					resp.StatusCode = http.StatusNotFound
+				}
+				return nil
+			},
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Printf("Proxy error for session %s port %s: %v", sessionID, port, err)
 				http.Error(w, "Proxy error", http.StatusBadGateway)
 			},
 		}

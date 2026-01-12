@@ -77,7 +77,7 @@ func (sm *ServiceManager) startServices() error {
 	envLoader := environment.NewLoader(sm.config.EnvVars)
 	envLoader.Load()
 
-	// Start piko service
+	// Start piko service for gotty
 	g.Add(func() error {
 		pikoConfig := services.PikoConfig{
 			RemoteURL:   sm.config.GetPikoAddress(),
@@ -99,6 +99,35 @@ func (sm *ServiceManager) startServices() error {
 	}, func(error) {
 		// piko service will stop automatically when context is cancelled
 	})
+
+	// Start piko services for attach-ports
+	for _, port := range sm.config.AttachPorts {
+		// Capture port variable for goroutine
+		attachPort := port
+		g.Add(func() error {
+			// Use endpoint ID format: {sessionID}-{port}
+			endpointID := fmt.Sprintf("%s-%d", sm.config.GetSessionID(), attachPort)
+			pikoConfig := services.PikoConfig{
+				RemoteURL:   sm.config.GetPikoAddress(),
+				EndpointID:  endpointID,
+				LocalAddr:   fmt.Sprintf("127.0.0.1:%d", attachPort),
+				Timeout:     30 * time.Second,
+				GracePeriod: 30 * time.Second,
+				AccessLog:   false,
+			}
+			pikoService := services.NewPikoService(pikoConfig, sm.ctx, sm.config.InsecureSkipVerify)
+			err := pikoService.Start()
+			if err != nil {
+				fmt.Printf("Failed to start piko for port %d: %v\n", attachPort, err)
+				return err
+			}
+			// Wait for context cancellation
+			<-sm.ctx.Done()
+			return sm.ctx.Err()
+		}, func(error) {
+			// piko service will stop automatically when context is cancelled
+		})
+	}
 
 	// Start gotty service
 	g.Add(func() error {
@@ -171,11 +200,20 @@ func (sm *ServiceManager) startServices() error {
 	defer removeSessionInfo(sessionID)
 
 	fmt.Printf("✅ Services started successfully!\n")
-	
+
 	// Construct remote access URL
 	remoteURL := fmt.Sprintf("%s/%s", strings.TrimRight(sm.config.GetHTTPURL(), "/"), sm.config.GetSessionID())
 	fmt.Printf("🌐 Access URL: %s\n", remoteURL)
 	fmt.Printf("🔒 Local URL: http://localhost:%d\n", sm.config.GottyPort)
+
+	// Show attached ports
+	if len(sm.config.AttachPorts) > 0 {
+		fmt.Printf("📌 Attached ports:\n")
+		for _, port := range sm.config.AttachPorts {
+			attachURL := fmt.Sprintf("%s/%s/%d", strings.TrimRight(sm.config.GetHTTPURL(), "/"), sm.config.GetSessionID(), port)
+			fmt.Printf("   - Port %d -> %s\n", port, attachURL)
+		}
+	}
 	
 	if sm.config.Password != "" {
 		fmt.Printf("🔐 HTTP auth: username=%s, password=%s\n", sessionID, sm.config.Password)

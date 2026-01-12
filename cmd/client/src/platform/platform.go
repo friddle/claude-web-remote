@@ -26,8 +26,8 @@ const (
 	SessionIDLength = 5
 	// PasswordLength is the length of auto-generated passwords
 	PasswordLength = 5
-	// AutoExitTimeout is the auto-exit timeout duration (24 hours)
-	AutoExitTimeoutHours = 24
+	// AutoExitTimeout is the auto-exit timeout duration (2 days)
+	AutoExitTimeoutHours = 48
 )
 
 // IsWindows checks if the current OS is Windows
