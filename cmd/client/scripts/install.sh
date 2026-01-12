@@ -24,6 +24,46 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Check if sudo is available
+can_use_sudo() {
+    # If already root, no need for sudo
+    if [ "$EUID" -eq 0 ]; then
+        return 0
+    fi
+
+    # Try sudo with a simple command (no password)
+    if sudo -n true 2>/dev/null; then
+        return 0
+    fi
+
+    # Try sudo with password (will prompt user)
+    if sudo -v >/dev/null 2>&1; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Set SUDO_PREFIX based on whether we can use sudo
+SUDO_PREFIX=""
+USE_SUDO="false"
+
+setup_sudo() {
+    if [ "$EUID" -eq 0 ]; then
+        USE_SUDO="true"
+        SUDO_PREFIX=""
+        log_info "Running as root"
+    elif can_use_sudo; then
+        USE_SUDO="true"
+        SUDO_PREFIX="sudo"
+        log_info "sudo is available, will use it for installation"
+    else
+        USE_SUDO="false"
+        SUDO_PREFIX=""
+        log_info "sudo not available, will install to user directory"
+    fi
+}
+
 # Detect operating system
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -52,6 +92,58 @@ detect_os() {
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Get npm bin directory
+get_npm_bin_dir() {
+    # Try to get npm bin directory, fallback to common locations
+    local npm_bin=$(npm bin -g 2>/dev/null)
+    if [ -n "$npm_bin" ]; then
+        echo "$npm_bin"
+        return
+    fi
+
+    # Fallback to common npm bin directories
+    for dir in "/opt/homebrew/bin" "/usr/local/bin" "$HOME/.local/bin"; do
+        if [ -d "$dir" ]; then
+            echo "$dir"
+            return
+        fi
+    done
+
+    # Default fallback
+    echo "/usr/local/bin"
+}
+
+# Setup PATH in shell profile
+setup_path() {
+    local path_entry="$1"
+
+    # Check if PATH entry already exists in common shell configs
+    for profile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+        if [ -f "$profile" ]; then
+            if grep -q "PATH.*$path_entry" "$profile" 2>/dev/null; then
+                return 0  # Already exists
+            fi
+        fi
+    done
+
+    # Add to .profile (for login shells)
+    if [ -f "$HOME/.profile" ]; then
+        echo "export PATH=\"\$PATH:$path_entry\"" >> "$HOME/.profile"
+    fi
+
+    # Add to .bashrc (for bash shells)
+    if [ -f "$HOME/.bashrc" ]; then
+        echo "export PATH=\"\$PATH:$path_entry\"" >> "$HOME/.bashrc"
+    fi
+
+    # Add to .zshrc (for zsh shells)
+    if [ -f "$HOME/.zshrc" ]; then
+        echo "export PATH=\"\$PATH:$path_entry\"" >> "$HOME/.zshrc"
+    fi
+
+    log_info "Added $path_entry to PATH in shell profile"
 }
 
 # Configure npm to use Aliyun mirror (for China network environment)
@@ -96,30 +188,48 @@ install_nodejs() {
             brew install node
             ;;
         debian|ubuntu)
-            sudo apt-get update
-            sudo apt-get install -y ca-certificates curl gnupg
-            sudo mkdir -p /etc/apt/keyrings
+            $SUDO_PREFIX apt-get update
+            $SUDO_PREFIX apt-get install -y ca-certificates curl gnupg
+            $SUDO_PREFIX mkdir -p /etc/apt/keyrings
 
             # Try Aliyun mirror first if enabled
             if [ "$use_mirror" = "true" ]; then
                 log_info "Using Aliyun mirror for Node.js installation..."
                 # Use Aliyun Node.js mirror
-                curl -fsSL https://mirrors.aliyun.com/nodesource/setup_20.x | sudo -E bash -
+                curl -fsSL https://mirrors.aliyun.com/nodesource/setup_20.x | $SUDO_PREFIX -E bash -
             else
                 # Use NodeSource repository to install Node.js 20.x
-                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO_PREFIX -E bash -
             fi
 
-            sudo apt-get install -y nodejs npm
+            $SUDO_PREFIX apt-get install -y nodejs npm
+
+            # Ensure common Node.js paths are in PATH
+            export PATH="/usr/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+            hash -r 2>/dev/null || true
+
+            # Persist PATH to shell profiles for future sessions (only for user installation)
+            if [ "$USE_SUDO" = "false" ]; then
+                setup_path "/usr/local/bin"
+                setup_path "/usr/bin"
+            fi
+
+            # Verify npm is available after installation
+            if ! command -v npm >/dev/null 2>&1; then
+                log_error "npm was not installed properly"
+                log_error "node: $(which node 2>/dev/null || echo 'not found')"
+                log_error "npm: $(which npm 2>/dev/null || echo 'not found')"
+                return 1
+            fi
             ;;
         alpine)
-            sudo apk update
+            $SUDO_PREFIX apk update
             # Use Aliyun mirror for apk if enabled
             if [ "$use_mirror" = "true" ]; then
                 log_info "Configuring Aliyun mirror for apk..."
-                sudo sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+                $SUDO_PREFIX sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
             fi
-            sudo apk add --no-cache nodejs npm
+            $SUDO_PREFIX apk add --no-cache nodejs npm
             ;;
         *)
             log_error "Unsupported operating system: $os"
@@ -143,8 +253,8 @@ install_claude_code() {
         return 0
     fi
 
-    # Also check global npm paths when running as root
-    if [ "$EUID" -eq 0 ]; then
+    # Also check global npm paths when using sudo
+    if [ "$USE_SUDO" = "true" ]; then
         export PATH="/usr/local/bin:/usr/bin:$PATH"
         hash -r 2>/dev/null || true
         if command_exists claude; then
@@ -156,9 +266,9 @@ install_claude_code() {
 
     log_warn "claude is not installed, starting installation..."
 
-    # Configure npm to use user directory if not root
-    if [ "$EUID" -ne 0 ]; then
-        log_info "Not running as root, setting npm prefix to user directory..."
+    # Configure npm to use user directory if not using sudo
+    if [ "$USE_SUDO" = "false" ]; then
+        log_info "No sudo available, setting npm prefix to user directory..."
         npm config set prefix "$HOME/.local"
         export PATH="$HOME/.local/bin:$PATH"
     fi
@@ -183,11 +293,14 @@ install_claude_code() {
     # Install using npm globally
     log_info "Installing claude via npm..."
     log_info "npm location: $(which npm)"
-    npm install -g @anthropic-ai/claude-code
+    $SUDO_PREFIX npm install -g @anthropic-ai/claude-code
 
     # Create symlink from claude-code to claude if it doesn't exist
-    if [ "$EUID" -eq 0 ]; then
-        export PATH="/usr/local/bin:/usr/bin:$PATH"
+    if [ "$USE_SUDO" = "true" ]; then
+        # Get npm bin directory and add to PATH
+        NPM_BIN_DIR=$(get_npm_bin_dir)
+        log_info "npm bin directory: $NPM_BIN_DIR"
+        export PATH="$NPM_BIN_DIR:$PATH"
     else
         export PATH="$HOME/.local/bin:$PATH"
     fi
@@ -211,6 +324,8 @@ install_claude_code() {
         log_error "PATH: $PATH"
         log_error "which claude: $(which claude 2>/dev/null || echo 'not found')"
         log_error "ls /usr/local/bin/claude: $(ls -la /usr/local/bin/claude 2>/dev/null || echo 'not found')"
+        log_error "ls /opt/homebrew/bin/claude: $(ls -la /opt/homebrew/bin/claude 2>/dev/null || echo 'not found')"
+        log_error "npm config get prefix: $(npm config get prefix 2>/dev/null || echo 'not found')"
         return 1
     fi
 }
@@ -244,6 +359,9 @@ detect_china_network() {
 main() {
     log_info "Starting Claude Code installation..."
     log_info "Detecting operating system..."
+
+    # Setup sudo first
+    setup_sudo
 
     # Check for proxy environment variables
     if [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
