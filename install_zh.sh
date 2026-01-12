@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="${VERSION:-v0.2}"
+VERSION="${VERSION:-v0.3}"
 REPO="friddle/claude-web-remote"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 # 使用 GitHub 加速代理
@@ -162,8 +162,7 @@ verify_installation() {
         print_error "在 PATH 中找不到 clauded"
         print_info "请将 $INSTALL_DIR 添加到您的 PATH:"
         echo ""
-        echo "  export PATH=\"
-$PATH:$INSTALL_DIR\""
+        echo "  export PATH=\"\$PATH:$INSTALL_DIR\""
         echo ""
         exit 1
     fi
