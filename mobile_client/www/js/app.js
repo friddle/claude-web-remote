@@ -7,6 +7,7 @@ class App {
     constructor() {
         this.sessions = JSON.parse(localStorage.getItem(APP_KEY_SESSIONS) || '[]');
         this.currentSession = null;
+        this.eventSource = null;
     }
 
     init() {
@@ -157,9 +158,7 @@ class App {
         if (frame) {
             // Construct URL: https://session:password@host/session
             // Or if host is just domain: https://domain/session
-            // The logic from previous app.js: `https://${session}:${password}@${host}/${session}`
 
-            // Handle host having protocol or not
             let host = session.host;
             let protocol = 'https://';
             if (host.startsWith('http://') || host.startsWith('https://')) {
@@ -178,15 +177,28 @@ class App {
             frame.src = url;
         }
 
+        // Connect to notifications
+        this.connectToNotifications(session);
+
         this.showView('view-session');
     }
 
     closeSession() {
         this.currentSession = null;
+
+        // Close terminal
         const frame = document.getElementById('terminalFrame');
         if (frame) {
             frame.src = 'about:blank';
         }
+
+        // Disconnect notifications
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+            console.log('SSE Disconnected');
+        }
+
         this.showView('view-home');
     }
 
@@ -220,6 +232,117 @@ class App {
         }
     }
 
+    // --- Notifications ---
+
+    connectToNotifications(session) {
+        if (this.eventSource) {
+            this.eventSource.close();
+        }
+
+        let host = session.host;
+        let protocol = 'https://';
+        if (host.startsWith('http://')) {
+             protocol = 'http://';
+             host = host.substring(7);
+        } else if (host.startsWith('https://')) {
+             host = host.substring(8);
+        }
+
+        // Remove trailing slash if any
+        if (host.endsWith('/')) {
+            host = host.slice(0, -1);
+        }
+
+        const url = `${protocol}${host}/api/v1/notifications/stream?session_id=${session.sessionId}`;
+        console.log('Connecting to SSE:', url);
+
+        try {
+            this.eventSource = new EventSource(url);
+
+            this.eventSource.onopen = () => console.log('SSE Connected');
+
+            this.eventSource.onerror = (err) => {
+                console.error('SSE Error:', err);
+            };
+
+            // Listen for generic message
+            this.eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this.handleNotification(data);
+                } catch(err) {
+                    // console.error('Parse error', err);
+                }
+            };
+
+            // Listen for specific types
+            ['task_completed', 'error', 'progress', 'system_status'].forEach(type => {
+                this.eventSource.addEventListener(type, (e) => {
+                     try {
+                        const data = JSON.parse(e.data);
+                        this.handleNotification(data);
+                    } catch(err) {
+                        console.error('Parse error', err);
+                    }
+                });
+            });
+
+        } catch (e) {
+            console.error('Failed to create EventSource:', e);
+        }
+    }
+
+    handleNotification(notif) {
+        console.log('Notification received:', notif);
+        const title = notif.Type || 'Notification';
+        // Handle data being an object or string
+        let body = '';
+        if (notif.Data) {
+            body = typeof notif.Data === 'string' ? notif.Data : JSON.stringify(notif.Data);
+        } else if (notif.Message) {
+            body = notif.Message;
+        }
+
+        // Show local notification
+        LocalNotifications.schedule({
+            notifications: [
+                {
+                    id: Date.now(),
+                    title: title,
+                    body: body,
+                    schedule: { at: new Date() }
+                }
+            ]
+        });
+
+        this.showToast(`${title}: ${body}`);
+    }
+
+    showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 9999;
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     // --- Tmux Controls ---
 
     sendTmux(action) {
@@ -227,16 +350,7 @@ class App {
 
         console.log('Sending Tmux Action:', action);
 
-        // NOTE: This is a simulation/placeholder.
-        // Sending actual keys to the iframe requires the iframe to be on the same origin
-        // or the server to expose a specific API for input injection.
-        // Assuming Gotty running on the server might capture these if we use a specific API.
-
-        // If we were using a native terminal plugin, we would write to the PTY here.
-
-        // For now, we'll try to use a hypothetical API endpoint if it existed,
-        // or just show feedback to the user.
-
+        // Feedback
         const feedback = document.createElement('div');
         feedback.style.position = 'fixed';
         feedback.style.top = '50%';
