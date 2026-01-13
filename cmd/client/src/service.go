@@ -3,6 +3,7 @@ package src
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -20,18 +21,21 @@ import (
 
 // ServiceManager service manager
 type ServiceManager struct {
-	config *Config
-	ctx    context.Context
-	cancel context.CancelFunc
+	config   *Config
+	ctx      context.Context
+	cancel   context.CancelFunc
+	notifier *Notifier
 }
 
 // NewServiceManager creates a new service manager
 func NewServiceManager(config *Config) *ServiceManager {
 	ctx, cancel := context.WithCancel(context.Background())
+	notifier := NewNotifier(config.GetHTTPURL(), config.GetSessionID())
 	return &ServiceManager{
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
+		config:   config,
+		ctx:      ctx,
+		cancel:   cancel,
+		notifier: notifier,
 	}
 }
 
@@ -163,6 +167,21 @@ func (sm *ServiceManager) startServices() error {
 	}, func(error) {
 		sm.cancel()
 	})
+
+	// Start notification watcher (only if tmux is available)
+	tmuxService := NewTmuxService(sm.config.GetSessionID())
+	if tmuxService.IsAvailable() {
+		g.Add(func() error {
+			fmt.Printf("🔔 Starting notification watcher...\n")
+			watcher := NewTmuxWatcher(sm.config.GetSessionID(), sm.notifier, sm.ctx)
+			if err := watcher.Start(); err != nil {
+				log.Printf("Notification watcher stopped: %v", err)
+			}
+			return nil
+		}, func(error) {
+			// Watcher will stop automatically when context is cancelled
+		})
+	}
 
 	// 24-hour timeout - only enable when AutoExit is true
 	if sm.config.AutoExit {
