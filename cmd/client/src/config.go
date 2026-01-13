@@ -18,6 +18,7 @@ type Config struct {
 	Remote             string   `json:"remote"`             // remote server address (format: https://host or host:port)
 	Session            string   `json:"session"`            // session ID (auto-generated if empty)
 	Password           string   `json:"-"`                  // password for authentication (hidden from JSON)
+	AuthName           string   `json:"auth_name"`         // auth name for http_auth key (default: "session")
 	CodeCmd            string   `json:"codecmd"`            // AI command tool to use
 	Flags              string   `json:"flags"`              // flags to pass to claude-code
 	EnvVars            []string `json:"-"`                  // environment variables (hidden from JSON, may contain secrets)
@@ -35,6 +36,7 @@ func NewConfig() *Config {
 		Remote:             getEnvOrDefault("REMOTE", ""),
 		Session:            getEnvOrDefault("SESSION", ""),
 		Password:           getEnvOrDefault("PASSWORD", ""),
+		AuthName:           getEnvOrDefault("AUTH_NAME", "session"),
 		CodeCmd:            getEnvOrDefault("CODECMD", "claude"),
 		Flags:              getEnvOrDefault("FLAGS", ""),
 		EnvVars:            []string{},
@@ -274,6 +276,11 @@ func (c *Config) ToArgs() []string {
 	// --password (Mandatory)
 	if c.Password != "" {
 		args = append(args, "--password", c.Password)
+	}
+
+	// --auth-name
+	if c.AuthName != "" && c.AuthName != "session" {
+		args = append(args, "--auth-name", c.AuthName)
 	}
 
 	// --codecmd

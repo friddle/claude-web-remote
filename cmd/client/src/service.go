@@ -140,7 +140,7 @@ func (sm *ServiceManager) startServices() error {
 			TitleFormat:     sm.config.CodeCmd + " - " + sessionID,
 			WSOrigin:        ".*",
 			EnableBasicAuth: sm.config.Password != "",
-			Credential:      sessionID + ":" + sm.config.Password,
+			Credential:      sm.config.AuthName + ":" + sm.config.Password,
 			Command:         command,
 			Args:            args,
 		}
