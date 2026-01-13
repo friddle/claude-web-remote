@@ -79,3 +79,4 @@ node_modules/
 *.tar.gz
 *.zip
 *.apk
+tmp_scripts/
