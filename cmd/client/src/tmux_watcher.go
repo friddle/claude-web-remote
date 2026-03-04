@@ -86,11 +86,17 @@ func (tw *TmuxWatcher) Start() error {
 
 // captureOutput captures the current tmux session output
 func (tw *TmuxWatcher) captureOutput() (string, error) {
+	// First check if session is active
+	if !tw.IsSessionActive() {
+		return "", nil
+	}
+
 	// Use tmux capture-pane to get output
 	cmd := exec.Command("tmux", "capture-pane", "-t", tw.sessionName, "-p", "-S", "-1000")
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		// Don't return error - session might just be empty or not ready
+		return "", nil
 	}
 
 	return string(output), nil

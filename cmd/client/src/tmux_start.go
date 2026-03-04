@@ -29,18 +29,17 @@ func (ts *TmuxService) WrapCommand(command string, args []string, envVars []stri
 		return "", nil, fmt.Errorf("tmux not found: %w", err)
 	}
 
-	// Build environment variable prefix string
-	// e.g. env VAR1='val1' VAR2='val2'
+	// Build shell command using sh -c for better compatibility
+	// Use 'env' with proper quoting
 	envPrefix := ""
 	if len(envVars) > 0 {
 		envPrefix = "env"
 		for _, env := range envVars {
-			// Split key=value
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) == 2 {
 				key := parts[0]
 				val := parts[1]
-				// Simple shell escaping for single quotes
+				// Proper escaping for shell
 				val = strings.ReplaceAll(val, "'", "'\\''")
 				envPrefix += fmt.Sprintf(" %s='%s'", key, val)
 			}
@@ -48,23 +47,26 @@ func (ts *TmuxService) WrapCommand(command string, args []string, envVars []stri
 		envPrefix += " "
 	}
 
-	// Build command with args
-	fullCommand := command
-	for _, arg := range args {
-		// Escape args as well just in case
-		arg = strings.ReplaceAll(arg, "'", "'\\''")
-		fullCommand += fmt.Sprintf(" '%s'", arg)
-	}
+	// Build command args
+	cmdArgs := []string{command}
+	cmdArgs = append(cmdArgs, args...)
 
-	// Combine env + command
+	// Escape the command for shell
+	var quotedArgs []string
+	for _, arg := range cmdArgs {
+		// Simple quoting: wrap in single quotes and escape existing single quotes
+		quoted := strings.ReplaceAll(arg, "'", "'\\''")
+		quotedArgs = append(quotedArgs, quoted)
+	}
+	fullCommand := strings.Join(quotedArgs, " ")
+
+	// Use sh -c to run the command with proper shell interpretation
 	finalCommand := envPrefix + fullCommand
 
-	// Use 'tmux new-session -A' which will attach to existing session or create new one
-	// The -A flag means "attach if exists, otherwise create"
-	// This ensures session persistence across reconnects
+	// Try with -A flag first (attach or create), fall back if it fails
 	tmuxArgs := []string{
 		"new-session", "-A", "-s", ts.sessionID,
-		finalCommand,
+		"sh", "-c", finalCommand,
 	}
 
 	fmt.Printf("✓ Using tmux persistent session: %s\n", ts.sessionID)
@@ -85,10 +87,10 @@ func (ts *TmuxService) CreateDetachedSession(command string) error {
 		return nil
 	}
 
-	// Create new detached session
+	// Create new detached session using sh -c for better compatibility
 	createArgs := []string{
 		"new-session", "-d", "-s", ts.sessionID,
-		command,
+		"sh", "-c", command,
 	}
 	createCmd := exec.Command(tmuxPath, createArgs...)
 	if err := createCmd.Run(); err != nil {

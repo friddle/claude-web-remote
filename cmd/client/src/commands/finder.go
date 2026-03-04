@@ -24,10 +24,10 @@ func NewFinder(codeCmd string) *Finder {
 func (f *Finder) FindCommand() string {
 	// Map of supported commands
 	commandMap := map[string]string{
-		"claude":    "claude",
-		"opencode":  "opencode",
-		"kimi":      "kimi",
-		"gemini":    "gemini",
+		"claude":   "claude",
+		"opencode": "opencode",
+		"kimi":     "kimi",
+		"gemini":   "gemini",
 	}
 
 	// Get the actual command name
@@ -53,6 +53,7 @@ func (f *Finder) FindCommand() string {
 }
 
 // findClaudeCommand searches for claude command with priority
+// Falls back to opencode if claude is not found
 func (f *Finder) findClaudeCommand() string {
 	// Priority 1: Check if 'claude' command exists in PATH
 	if path, err := exec.LookPath("claude"); err == nil {
@@ -92,8 +93,30 @@ func (f *Finder) findClaudeCommand() string {
 		}
 	}
 
+	// Priority 4: Fallback to opencode if claude is not found
 	fmt.Println("⚠️  Warning: claude command not found in PATH")
-	return "claude" // Default fallback
+	fmt.Println("🔄 Falling back to opencode...")
+	if path, err := exec.LookPath("opencode"); err == nil {
+		fmt.Printf("✓ Using opencode from: %s\n", path)
+		return "opencode"
+	}
+
+	// Priority 5: Check for kimi
+	if path, err := exec.LookPath("kimi"); err == nil {
+		fmt.Printf("✓ Using kimi from: %s\n", path)
+		return "kimi"
+	}
+
+	// Priority 6: Check for gemini
+	if path, err := exec.LookPath("gemini"); err == nil {
+		fmt.Printf("✓ Using gemini from: %s\n", path)
+		return "gemini"
+	}
+
+	// Final fallback - still return claude, but warn user
+	fmt.Println("⚠️  No AI command found (claude, opencode, kimi, gemini)")
+	fmt.Println("⚠️  Please install one of these commands first")
+	return "claude"
 }
 
 // IsClaudeCodeCommand verifies if the command is actually Claude Code
