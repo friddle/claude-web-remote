@@ -44,7 +44,7 @@ Download and run the binary directly:
 
 ```bash
 # Download the binary
-wget https://github.com/friddle/claude-web-remote/releases/download/v0.3/clauded-linux-amd64
+wget https://github.com/friddle/claude-web-remote/releases/download/v0.6/clauded-linux-amd64
 
 # Make it executable
 chmod +x clauded-linux-amd64
