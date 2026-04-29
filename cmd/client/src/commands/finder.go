@@ -15,6 +15,40 @@ type Finder struct {
 	codeCmd string
 }
 
+// CommandInfo holds information about a supported AI command
+type CommandInfo struct {
+	Name        string
+	BinaryName  string
+	NPMPackage  string
+	Description string
+}
+
+// SupportedCommands lists all supported AI command tools
+var SupportedCommands = map[string]CommandInfo{
+	"claude": {
+		Name:        "claude",
+		BinaryName:  "claude",
+		NPMPackage:  "@anthropic-ai/claude-code",
+		Description: "Claude Code by Anthropic",
+	},
+	"opencode": {
+		Name:        "opencode",
+		BinaryName:  "opencode",
+		Description: "OpenCode CLI",
+	},
+	"gemini": {
+		Name:        "gemini",
+		BinaryName:  "gemini",
+		NPMPackage:  "@anthropic-ai/gemini-cli",
+		Description: "Gemini CLI by Google",
+	},
+	"kimi": {
+		Name:        "kimi",
+		BinaryName:  "kimi",
+		Description: "Kimi CLI",
+	},
+}
+
 // NewFinder creates a new command finder
 func NewFinder(codeCmd string) *Finder {
 	return &Finder{codeCmd: codeCmd}
@@ -22,34 +56,53 @@ func NewFinder(codeCmd string) *Finder {
 
 // FindCommand searches for and returns the appropriate AI command tool
 func (f *Finder) FindCommand() string {
-	// Map of supported commands
-	commandMap := map[string]string{
-		"claude":   "claude",
-		"opencode": "opencode",
-		"kimi":     "kimi",
-		"gemini":   "gemini",
-	}
-
-	// Get the actual command name
-	cmdName, ok := commandMap[f.codeCmd]
+	cmdInfo, ok := SupportedCommands[f.codeCmd]
 	if !ok {
 		fmt.Printf("⚠️  Unknown codecmd: %s, falling back to 'claude'\n", f.codeCmd)
-		cmdName = "claude"
+		cmdInfo = SupportedCommands["claude"]
 	}
 
-	// Special handling for 'claude' command (check multiple variants)
 	if f.codeCmd == "claude" {
 		return f.findClaudeCommand()
 	}
 
-	// For other commands, just check if they exist in PATH
-	if path, err := exec.LookPath(cmdName); err == nil {
-		fmt.Printf("✓ Using %s command from: %s\n", f.codeCmd, path)
-		return cmdName
+	if f.codeCmd == "gemini" {
+		return f.findGeminiCommand()
 	}
 
-	fmt.Printf("⚠️  Warning: %s command not found in PATH\n", cmdName)
-	return cmdName
+	if f.codeCmd == "opencode" {
+		return f.findOpenCodeCommand()
+	}
+
+	if path, err := exec.LookPath(cmdInfo.BinaryName); err == nil {
+		fmt.Printf("✓ Using %s command from: %s\n", f.codeCmd, path)
+		return cmdInfo.BinaryName
+	}
+
+	fmt.Printf("⚠️  Warning: %s command not found in PATH\n", cmdInfo.BinaryName)
+	return cmdInfo.BinaryName
+}
+
+// findGeminiCommand searches for gemini CLI
+func (f *Finder) findGeminiCommand() string {
+	if path, err := exec.LookPath("gemini"); err == nil {
+		fmt.Printf("✓ Using gemini command from: %s\n", path)
+		return "gemini"
+	}
+
+	fmt.Printf("⚠️  Warning: gemini command not found in PATH\n")
+	return "gemini"
+}
+
+// findOpenCodeCommand searches for opencode CLI
+func (f *Finder) findOpenCodeCommand() string {
+	if path, err := exec.LookPath("opencode"); err == nil {
+		fmt.Printf("✓ Using opencode command from: %s\n", path)
+		return "opencode"
+	}
+
+	fmt.Printf("⚠️  Warning: opencode command not found in PATH\n")
+	return "opencode"
 }
 
 // findClaudeCommand searches for claude command with priority
@@ -101,20 +154,20 @@ func (f *Finder) findClaudeCommand() string {
 		return "opencode"
 	}
 
-	// Priority 5: Check for kimi
-	if path, err := exec.LookPath("kimi"); err == nil {
-		fmt.Printf("✓ Using kimi from: %s\n", path)
-		return "kimi"
-	}
-
-	// Priority 6: Check for gemini
+	// Priority 5: Check for gemini
 	if path, err := exec.LookPath("gemini"); err == nil {
 		fmt.Printf("✓ Using gemini from: %s\n", path)
 		return "gemini"
 	}
 
+	// Priority 6: Check for kimi
+	if path, err := exec.LookPath("kimi"); err == nil {
+		fmt.Printf("✓ Using kimi from: %s\n", path)
+		return "kimi"
+	}
+
 	// Final fallback - still return claude, but warn user
-	fmt.Println("⚠️  No AI command found (claude, opencode, kimi, gemini)")
+	fmt.Println("⚠️  No AI command found (claude, opencode, gemini, kimi)")
 	fmt.Println("⚠️  Please install one of these commands first")
 	return "claude"
 }

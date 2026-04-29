@@ -8,11 +8,6 @@ cd "$SCRIPT_DIR"
 echo "🧹 Cleaning up old build artifacts..."
 make clean
 
-echo "📦 Building frontend with webpack..."
-cd gotty/js
-npx webpack --config webpack.config.js
-cd ../..
-
 echo "🔨 Building project..."
 make build
 

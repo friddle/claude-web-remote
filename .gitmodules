@@ -1,3 +1,3 @@
-[submodule "cmd/client/gotty"]
-	path = cmd/client/gotty
-	url = https://github.com/friddle/gotty
+[submodule "gotty-piko"]
+	path = gotty-piko
+	url = https://github.com/friddle/gotty-piko.git

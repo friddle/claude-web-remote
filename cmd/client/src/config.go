@@ -2,92 +2,86 @@ package src
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"clauded-client/src/platform"
+	"github.com/google/uuid"
 )
 
 // Config configuration structure
 type Config struct {
-	Remote             string   `json:"remote"`             // remote server address (format: https://host or host:port)
-	Session            string   `json:"session"`            // session ID (auto-generated if empty)
-	Password           string   `json:"-"`                  // password for authentication (hidden from JSON)
-	AuthName           string   `json:"auth_name"`         // auth name for http_auth key (default: "session")
-	CodeCmd            string   `json:"codecmd"`            // AI command tool to use
-	Flags              string   `json:"flags"`              // flags to pass to claude-code
-	EnvVars            []string `json:"-"`                  // environment variables (hidden from JSON, may contain secrets)
-	GottyPort          int      `json:"port"`               // local gotty port (auto allocated)
-	AttachPorts        []int    `json:"attach_ports"`       // additional local ports to forward
-	AutoExit           bool     `json:"auto_exit"`          // enable 24-hour auto exit (default: true)
+	Remote             string   `json:"remote"`               // remote server address (format: https://host or host:port)
+	Session            string   `json:"session"`              // session ID / endpoint path (auto-generated if empty)
+	AuthName           string   `json:"auth_name"`            // auth username for Basic Auth (auto-generated if not set)
+	Password           string   `json:"-"`                    // password for authentication (hidden from JSON)
+	CodeCmd            string   `json:"codecmd"`              // AI command tool to use
+	Flags              string   `json:"flags"`                // flags to pass to codecmd
+	EnvVars            []string `json:"-"`                    // environment variables (hidden from JSON, may contain secrets)
+	GottyPort          int      `json:"port"`                 // local gotty port (auto allocated)
+	Terminal           string   `json:"terminal"`             // specify terminal type (zsh, bash, sh, etc.)
+	Tmux               bool     `json:"tmux"`                 // use tmux for persistent sessions
+	Auth               bool     `json:"auth"`                 // enable Basic Authentication
+	AutoExit           bool     `json:"auto_exit"`            // enable 24-hour auto exit (default: true)
+	EnableNotify       bool     `json:"enable_notify"`        // enable notify-send interception
+	NotifyWebhook      string   `json:"notify_webhook"`       // webhook URL to forward notifications to
+	StaticIndex        string   `json:"static_index"`         // local directory to serve as static files at /files/
+	AttachPort         string   `json:"attach_port"`          // map a local port to /port/ path
 	InsecureSkipVerify bool     `json:"insecure_skip_verify"` // skip HTTPS certificate verification
-	Daemon             bool     `json:"daemon"`             // run as daemon (background mode)
-	SkipInstall        bool     `json:"skip_install"`       // skip claude-code installation check
+	Daemon             bool     `json:"daemon"`               // run as daemon (background mode)
+	SkipInstall        bool     `json:"skip_install"`         // skip AI command installation check
+	PidFile            string   `json:"pid_file"`             // PID file path for daemon mode
 }
 
 // NewConfig creates a new configuration instance
 func NewConfig() *Config {
 	return &Config{
-		Remote:             getEnvOrDefault("REMOTE", ""),
+		Remote:             getEnvOrDefault("REMOTE", "https://clauded.friddle.me"),
 		Session:            getEnvOrDefault("SESSION", ""),
-		Password:           getEnvOrDefault("PASSWORD", ""),
-		AuthName:           getEnvOrDefault("AUTH_NAME", "session"),
+		AuthName:           getEnvOrDefault("AUTH_NAME", ""),
+		Password:           getEnvOrDefault("PASS", ""),
 		CodeCmd:            getEnvOrDefault("CODECMD", "claude"),
 		Flags:              getEnvOrDefault("FLAGS", ""),
 		EnvVars:            []string{},
-		GottyPort:          0,                                              // will be auto allocated on startup
-		AutoExit:           getEnvBoolOrDefault("AUTO_EXIT", true),         // read auto exit setting from env, default true
+		GottyPort:          0,                                                  // will be auto allocated on startup
+		Terminal:           getEnvOrDefault("TERMINAL", ""),                    // from env or empty for auto-detect
+		Tmux:               getEnvBoolOrDefault("TMUX", true),                  // use tmux by default
+		Auth:               getEnvBoolOrDefault("AUTH", true),                  // enable Basic Auth by default
+		AutoExit:           getEnvBoolOrDefault("AUTO_EXIT", true),             // read auto exit setting from env, default true
+		EnableNotify:       getEnvBoolOrDefault("ENABLE_NOTIFY", true),         // enable notify-send by default
+		NotifyWebhook:      getEnvOrDefault("NOTIFY_WEBHOOK", ""),              // webhook URL
+		StaticIndex:        getEnvOrDefault("STATIC_INDEX", "."),               // default to cwd
+		AttachPort:         getEnvOrDefault("ATTACH_PORT", ""),                 // attach port
 		InsecureSkipVerify: getEnvBoolOrDefault("INSECURE_SKIP_VERIFY", false), // read skip cert verify from env, default false
-		Daemon:             getEnvBoolOrDefault("DAEMON", true),            // read daemon mode from env, default true
+		Daemon:             getEnvBoolOrDefault("DAEMON", true),                // read daemon mode from env, default true
 		SkipInstall:        false,
+		PidFile:            getEnvOrDefault("PID_FILE", "/tmp/clauded.pid"), // PID file path
 	}
 }
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
+	if c.Session == "" {
+		c.Session = generateDefaultSession()
+	}
 	if c.Remote == "" {
-		return fmt.Errorf("remote cannot be empty")
+		return fmt.Errorf("remote server address is required")
 	}
-
-	// Normalize remote: remove protocol prefix for host extraction
-	remote := c.Remote
-	host := c.Remote
-	if strings.HasPrefix(remote, "https://") {
-		host = strings.TrimPrefix(remote, "https://")
-	} else if strings.HasPrefix(remote, "http://") {
-		host = strings.TrimPrefix(remote, "http://")
-	}
-
-	// Extract host part (remove port if present)
-	hostParts := strings.Split(host, ":")
-	hostname := hostParts[0]
-
-	// Security mechanism for default host
-	isDefaultHost := platform.IsDefaultHost(hostname)
-
-	if isDefaultHost {
-		// For default host, auto-generate both session and password if not provided
-		if c.Session == "" {
-			c.Session = generateShortSessionID()
+	if c.Auth {
+		if c.AuthName == "" {
+			c.AuthName = generateRandomString(8)
 		}
-
-		// Auto-generate password for default host
 		if c.Password == "" {
-			c.Password = generateShortPassword()
+			c.Password = generateRandomString(10)
 		}
-	} else {
-		// For custom hosts, session is optional, use short session ID
-		if c.Session == "" {
-			c.Session = generateShortSessionID()
-		}
-		// Password is optional for custom hosts
 	}
-
 	return nil
 }
 
@@ -235,6 +229,35 @@ func randInt() int {
 	return int(n.Int64())
 }
 
+// generateRandomString generates a random hex string
+func generateRandomString(length int) string {
+	b := make([]byte, length)
+	rand.Read(b)
+	return hex.EncodeToString(b)[:length]
+}
+
+// generateDefaultSession generates a session ID in user-dir-random format
+func generateDefaultSession() string {
+	user := os.Getenv("USER")
+	if user == "" {
+		user = os.Getenv("USERNAME")
+	}
+	if user == "" {
+		user = "unknown"
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "app"
+	}
+	dir := filepath.Base(cwd)
+	rand := generateRandomString(4)
+	session := fmt.Sprintf("%s-%s-%s", user, dir, rand)
+	if runtime.GOOS == "windows" {
+		session = strings.ToLower(session)
+	}
+	return session
+}
+
 // getEnvOrDefault gets environment variable or default value
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -267,20 +290,20 @@ func getEnvBoolOrDefault(key string, defaultValue bool) bool {
 func (c *Config) ToArgs() []string {
 	args := []string{}
 
-	// --remote (Mandatory)
+	// --remote
 	args = append(args, "--remote", c.Remote)
 
-	// --session (Mandatory)
+	// --session
 	args = append(args, "--session", c.GetSessionID())
 
-	// --password (Mandatory)
-	if c.Password != "" {
-		args = append(args, "--password", c.Password)
+	// --auth-name
+	if c.AuthName != "" {
+		args = append(args, "--auth-name", c.AuthName)
 	}
 
-	// --auth-name
-	if c.AuthName != "" && c.AuthName != "session" {
-		args = append(args, "--auth-name", c.AuthName)
+	// --pass
+	if c.Password != "" {
+		args = append(args, "--pass", c.Password)
 	}
 
 	// --codecmd
@@ -298,13 +321,37 @@ func (c *Config) ToArgs() []string {
 		args = append(args, "--env", env)
 	}
 
-	// --attach-ports (multiple)
-	for _, port := range c.AttachPorts {
-		args = append(args, "--attach-ports", fmt.Sprintf("%d", port))
+	// --attach-port
+	if c.AttachPort != "" {
+		args = append(args, "--attach-port", c.AttachPort)
 	}
 
 	// --auto-exit
 	args = append(args, fmt.Sprintf("--auto-exit=%t", c.AutoExit))
+
+	// --auth
+	args = append(args, fmt.Sprintf("--auth=%t", c.Auth))
+
+	// --terminal
+	if c.Terminal != "" {
+		args = append(args, "--terminal", c.Terminal)
+	}
+
+	// --tmux
+	args = append(args, fmt.Sprintf("--tmux=%t", c.Tmux))
+
+	// --enable-notify
+	args = append(args, fmt.Sprintf("--enable-notify=%t", c.EnableNotify))
+
+	// --notify-webhook
+	if c.NotifyWebhook != "" {
+		args = append(args, "--notify-webhook", c.NotifyWebhook)
+	}
+
+	// --static-index
+	if c.StaticIndex != "" && c.StaticIndex != "." {
+		args = append(args, "--static-index", c.StaticIndex)
+	}
 
 	// --insecure-skip-verify
 	if c.InsecureSkipVerify {
@@ -314,6 +361,11 @@ func (c *Config) ToArgs() []string {
 	// --skip-install-check
 	if c.SkipInstall {
 		args = append(args, "--skip-install-check")
+	}
+
+	// --pid-file
+	if c.PidFile != "" && c.PidFile != "/tmp/clauded.pid" {
+		args = append(args, "--pid-file", c.PidFile)
 	}
 
 	// Explicitly disable daemon mode for the child process

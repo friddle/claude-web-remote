@@ -76,6 +76,7 @@ func (sm *ServiceManager) startServices() error {
 
 	// Get the command to run
 	command, args := sm.getClaudeCodeCommand()
+	_ = args
 
 	// Load environment variables
 	envLoader := environment.NewLoader(sm.config.EnvVars)
@@ -104,50 +105,34 @@ func (sm *ServiceManager) startServices() error {
 		// piko service will stop automatically when context is cancelled
 	})
 
-	// Start piko services for attach-ports
-	for _, port := range sm.config.AttachPorts {
-		// Capture port variable for goroutine
-		attachPort := port
-		g.Add(func() error {
-			// Use endpoint ID format: {sessionID}-{port}
-			endpointID := fmt.Sprintf("%s-%d", sm.config.GetSessionID(), attachPort)
-			pikoConfig := services.PikoConfig{
-				RemoteURL:   sm.config.GetPikoAddress(),
-				EndpointID:  endpointID,
-				LocalAddr:   fmt.Sprintf("127.0.0.1:%d", attachPort),
-				Timeout:     30 * time.Second,
-				GracePeriod: 30 * time.Second,
-				AccessLog:   false,
-			}
-			pikoService := services.NewPikoService(pikoConfig, sm.ctx, sm.config.InsecureSkipVerify)
-			err := pikoService.Start()
-			if err != nil {
-				fmt.Printf("Failed to start piko for port %d: %v\n", attachPort, err)
-				return err
-			}
-			// Wait for context cancellation
-			<-sm.ctx.Done()
-			return sm.ctx.Err()
-		}, func(error) {
-			// piko service will stop automatically when context is cancelled
-		})
-	}
-
 	// Start gotty service
 	g.Add(func() error {
 		sessionID := sm.config.GetSessionID()
 		gottyConfig := services.GottyConfig{
-			Address:         "127.0.0.1",
-			Port:            sm.config.GottyPort,
-			Path:            "/" + sessionID,
-			PermitWrite:     true,
-			TitleFormat:     sm.config.CodeCmd + " - " + sessionID,
-			WSOrigin:        ".*",
-			EnableBasicAuth: sm.config.Password != "",
-			Credential:      sm.config.AuthName + ":" + sm.config.Password,
-			Command:         command,
-			Args:            args,
+			Address:       "127.0.0.1",
+			Port:          sm.config.GottyPort,
+			Path:          "/" + sessionID,
+			SessionName:   sessionID,
+			PermitWrite:   true,
+			TitleFormat:   "{{ .session_name }}",
+			WSOrigin:      ".*",
+			Auth:          sm.config.Auth,
+			EnableNotify:  sm.config.EnableNotify,
+			NotifyWebhook: sm.config.NotifyWebhook,
+			StaticIndex:   sm.config.StaticIndex,
+			AttachPort:    sm.config.AttachPort,
+			TitleVariables: map[string]interface{}{
+				"command":      command,
+				"session_name": sessionID,
+			},
 		}
+
+		if sm.config.Auth {
+			gottyConfig.AuthName = sm.config.AuthName
+			gottyConfig.Password = sm.config.Password
+			gottyConfig.EnableBasicAuth = true
+		}
+
 		gottyService := services.NewGottyService(gottyConfig, sm.ctx)
 		err := gottyService.Start()
 		if err != nil {
@@ -168,19 +153,21 @@ func (sm *ServiceManager) startServices() error {
 		sm.cancel()
 	})
 
-	// Start notification watcher (only if tmux is available)
-	tmuxService := NewTmuxService(sm.config.GetSessionID())
-	if tmuxService.IsAvailable() {
-		g.Add(func() error {
-			fmt.Printf("🔔 Starting notification watcher...\n")
-			watcher := NewTmuxWatcher(sm.config.GetSessionID(), sm.notifier, sm.ctx)
-			if err := watcher.Start(); err != nil {
-				log.Printf("Notification watcher stopped: %v", err)
-			}
-			return nil
-		}, func(error) {
-			// Watcher will stop automatically when context is cancelled
-		})
+	// Start notification watcher (only if tmux is enabled and available)
+	if sm.config.Tmux {
+		tmuxService := NewTmuxService(sm.config.GetSessionID())
+		if tmuxService.IsAvailable() {
+			g.Add(func() error {
+				fmt.Printf("🔔 Starting notification watcher...\n")
+				watcher := NewTmuxWatcher(sm.config.GetSessionID(), sm.notifier, sm.ctx)
+				if err := watcher.Start(); err != nil {
+					log.Printf("Notification watcher stopped: %v", err)
+				}
+				return nil
+			}, func(error) {
+				// Watcher will stop automatically when context is cancelled
+			})
+		}
 	}
 
 	// 24-hour timeout - only enable when AutoExit is true
@@ -225,15 +212,10 @@ func (sm *ServiceManager) startServices() error {
 	fmt.Printf("🌐 Access URL: %s\n", remoteURL)
 	fmt.Printf("🔒 Local URL: http://localhost:%d\n", sm.config.GottyPort)
 
-	// Show attached ports
-	if len(sm.config.AttachPorts) > 0 {
-		fmt.Printf("📌 Attached ports:\n")
-		for _, port := range sm.config.AttachPorts {
-			attachURL := fmt.Sprintf("%s/%s/%d", strings.TrimRight(sm.config.GetHTTPURL(), "/"), sm.config.GetSessionID(), port)
-			fmt.Printf("   - Port %d -> %s\n", port, attachURL)
-		}
+	if sm.config.AttachPort != "" {
+		fmt.Printf("📌 Port proxy: %s/%sport/%s\n", remoteURL, sm.config.GetSessionID()+"/", sm.config.AttachPort)
 	}
-	
+
 	if sm.config.Password != "" {
 		fmt.Printf("🔐 HTTP auth: username=%s, password=%s\n", sessionID, sm.config.Password)
 	} else {
@@ -296,16 +278,16 @@ func (sm *ServiceManager) getClaudeCodeCommand() (string, []string) {
 		args = append(args, flagParts...)
 	}
 
-	// Use tmux for persistent sessions
-	// According to gotty docs: "gotty tmux new -A -s gotty top"
-	tmuxService := NewTmuxService(sm.config.GetSessionID())
-	if tmuxService.IsAvailable() {
-		tmuxPath, tmuxArgs, err := tmuxService.WrapCommand(command, args, sm.config.EnvVars)
-		if err == nil {
-			return tmuxPath, tmuxArgs
+	// Use tmux for persistent sessions (if enabled)
+	if sm.config.Tmux {
+		tmuxService := NewTmuxService(sm.config.GetSessionID())
+		if tmuxService.IsAvailable() {
+			tmuxPath, tmuxArgs, err := tmuxService.WrapCommand(command, args, sm.config.EnvVars)
+			if err == nil {
+				return tmuxPath, tmuxArgs
+			}
+			fmt.Printf("Warning: tmux wrapping failed: %v, using direct command\n", err)
 		}
-		// If tmux wrapping fails, fall through to direct command
-		fmt.Printf("Warning: tmux wrapping failed: %v, using direct command\n", err)
 	}
 
 	// Fallback: return command without tmux

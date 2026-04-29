@@ -11,6 +11,12 @@ import (
 // ValidateAuthConfig checks if authorized configuration is present
 // and warns/errors if not.
 func ValidateAuthConfig(config *Config) error {
+	// Skip auth validation for non-claude commands
+	if config.CodeCmd != "claude" && config.CodeCmd != "" {
+		fmt.Printf("ℹ️  Skipping auth validation for codecmd=%s\n", config.CodeCmd)
+		return nil
+	}
+
 	// 1. Check for Anthropic API Key or Auth Token (env var)
 	if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" {
 		return nil
@@ -18,8 +24,8 @@ func ValidateAuthConfig(config *Config) error {
 
 	// 1.1 Check for Anthropic API Key/Token in config.EnvVars (command line flags)
 	for _, env := range config.EnvVars {
-		if (len(env) > 18 && env[:18] == "ANTHROPIC_API_KEY=") || 
-		   (len(env) > 21 && env[:21] == "ANTHROPIC_AUTH_TOKEN=") {
+		if (len(env) > 18 && env[:18] == "ANTHROPIC_API_KEY=") ||
+			(len(env) > 21 && env[:21] == "ANTHROPIC_AUTH_TOKEN=") {
 			return nil
 		}
 	}

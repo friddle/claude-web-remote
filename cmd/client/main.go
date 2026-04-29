@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"clauded-client/src"
 
@@ -20,43 +21,62 @@ func main() {
 func MakeMainCmd() *cobra.Command {
 	var (
 		session            string
-		password           string
 		authName           string
-		codeCmd            string
 		remote             string
+		codeCmd            string
 		flags              string
 		envVars            []string
-		attachPorts        []int
+		terminal           string
+		pass               string
+		tmux               bool
+		auth               bool
 		autoExit           bool
+		enableNotify       bool
+		notifyWebhook      string
+		staticIndex        string
+		attachPort         string
 		insecureSkipVerify bool
 		skipInstall        bool
 		daemon             bool
+		pidFile            string
 	)
 
 	rootCmd := &cobra.Command{
 		Use:   "clauded",
-		Short: "Claude Code remote client - Expose Claude Code via web terminal",
-		Long: `clauded is a command-line tool that exposes your local Claude Code terminal session
+		Short: "Share your AI coding terminal as a web application via piko",
+		Long: `clauded is a tool that exposes your local AI coding terminal session
 through gotty and piko services to a remote server, allowing you to access and use
-Claude Code from anywhere via a web browser.`,
+Claude Code / OpenCode / Gemini from anywhere via a web browser.
+
+Examples:
+  clauded --remote=https://clauded.friddle.me
+  clauded --remote=https://piko.example.com:8088 --session myterm --tmux=true
+  clauded --remote=https://piko.example.com:8088 --auth=false
+  clauded --remote=https://piko.example.com:8088 --notify-webhook=https://open.feishu.cn/...`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(session, password, authName, codeCmd, remote, flags, envVars, attachPorts, autoExit, insecureSkipVerify, skipInstall, daemon)
+			return runServe(session, authName, pass, codeCmd, remote, flags, envVars, terminal, tmux, auth, autoExit, enableNotify, notifyWebhook, staticIndex, attachPort, insecureSkipVerify, skipInstall, daemon, pidFile)
 		},
 	}
 
-	// Add command line flags to root command
-	rootCmd.Flags().StringVar(&remote, "remote", "", "Remote server address (default: https://clauded.friddle.me)")
-	rootCmd.Flags().StringVar(&session, "session", "", "Session ID (auto-generated for default server)")
-	rootCmd.Flags().StringVar(&password, "password", "", "Password for authentication (auto-generated for default server)")
-	rootCmd.Flags().StringVar(&authName, "auth-name", "session", "Auth name for http_auth key (default: session)")
+	rootCmd.Flags().StringVar(&session, "session", "", "Session ID for endpoint path (default: user_dir_random)")
+	rootCmd.Flags().StringVar(&authName, "auth-name", "", "Auth username for Basic Auth (auto-generated if not set)")
+	rootCmd.Flags().StringVar(&remote, "remote", "https://clauded.friddle.me", "Remote piko server address")
 	rootCmd.Flags().StringVar(&codeCmd, "codecmd", "claude", "AI command tool to use (claude, opencode, kimi, gemini)")
 	rootCmd.Flags().StringVar(&flags, "flags", "", "Flags to pass to codecmd (e.g., '--model opus')")
 	rootCmd.Flags().StringArrayVar(&envVars, "env", []string{}, "Environment variables to pass (e.g., -e KEY=value)")
-	rootCmd.Flags().IntSliceVar(&attachPorts, "attach-ports", []int{}, "Additional local ports to forward (e.g., --attach-ports 3000 --attach-ports 8080)")
-	rootCmd.Flags().BoolVar(&autoExit, "auto-exit", true, "Enable 2-day auto exit (default: true)")
-	rootCmd.Flags().BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "Skip HTTPS certificate verification (default: false)")
-	rootCmd.Flags().BoolVar(&skipInstall, "skip-install-check", false, "Skip claude-code installation check (default: false)")
-	rootCmd.Flags().BoolVarP(&daemon, "daemon", "d", true, "Run as daemon in background (default: true)")
+	rootCmd.Flags().StringVar(&terminal, "terminal", "", "Terminal type (zsh, bash, sh, powershell, etc.)")
+	rootCmd.Flags().StringVar(&pass, "pass", "", "Auth password (auto-generated if not set)")
+	rootCmd.Flags().BoolVar(&tmux, "tmux", true, "Use tmux for persistent sessions")
+	rootCmd.Flags().BoolVar(&auth, "auth", true, "Enable Basic Authentication")
+	rootCmd.Flags().BoolVar(&autoExit, "auto-exit", true, "Enable 24-hour auto exit")
+	rootCmd.Flags().BoolVar(&enableNotify, "enable-notify", true, "Enable notify-send interception")
+	rootCmd.Flags().StringVar(&notifyWebhook, "notify-webhook", "", "Webhook URL to forward notifications to (Feishu compatible)")
+	rootCmd.Flags().StringVar(&staticIndex, "static-index", ".", "Local directory to serve as static files at /files/")
+	rootCmd.Flags().StringVar(&attachPort, "attach-port", "", "Map a local port to /port/ path (e.g. 3000)")
+	rootCmd.Flags().BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "Skip HTTPS certificate verification")
+	rootCmd.Flags().BoolVar(&skipInstall, "skip-install-check", false, "Skip AI command installation check")
+	rootCmd.Flags().BoolVarP(&daemon, "daemon", "d", true, "Run as daemon (background process)")
+	rootCmd.Flags().StringVar(&pidFile, "pid-file", "/tmp/clauded.pid", "PID file path for daemon mode")
 
 	// Subcommand: session
 	sessionCmd := &cobra.Command{
@@ -100,20 +120,43 @@ Claude Code from anywhere via a web browser.`,
 	return rootCmd
 }
 
-func runServe(session, password, authName, codeCmd, remote, flags string, envVars []string, attachPorts []int, autoExit, insecureSkipVerify, skipInstall, daemon bool) error {
-	// Check and install claude-code if needed (only for claude command)
-	if !skipInstall && codeCmd == "claude" {
-		installer := src.NewInstaller()
-		if !installer.IsClaudeCodeInstalled() {
-			fmt.Println("claude-code not found, starting automatic installation...")
-			if err := installer.Install(); err != nil {
-				// Only log warning on verification failure, don't exit
-				// The installation may have succeeded but PATH isn't updated yet
-				fmt.Printf("⚠️  Warning: %v\n", err)
-				fmt.Println("⚠️  The installation may have succeeded, but verification failed.")
-				fmt.Println("⚠️  If claude-code was installed, you can try running with --skip-install-check flag")
-				fmt.Println("⚠️  Or restart your terminal and run clauded again")
-				// Don't return error - continue execution
+func runServe(session, authName, pass, codeCmd, remote, flags string, envVars []string, terminal string, tmux, auth, autoExit, enableNotify bool, notifyWebhook, staticIndex, attachPort string, insecureSkipVerify, skipInstall, daemon bool, pidFile string) error {
+	// Check and install AI command tool if needed
+	if !skipInstall {
+		installer := src.NewInstallerForCmd(codeCmd)
+		switch codeCmd {
+		case "claude":
+			if !installer.IsClaudeCodeInstalled() {
+				fmt.Println("claude not found, starting automatic installation...")
+				if err := installer.Install(); err != nil {
+					fmt.Printf("⚠️  Warning: %v\n", err)
+					fmt.Println("⚠️  The installation may have succeeded, but verification failed.")
+					fmt.Println("⚠️  If claude was installed, try running with --skip-install-check flag")
+				}
+			}
+		case "opencode":
+			if !installer.IsCommandInstalled("opencode") {
+				fmt.Println("opencode not found, starting automatic installation...")
+				if err := installer.Install(); err != nil {
+					fmt.Printf("⚠️  Warning: %v\n", err)
+					fmt.Println("⚠️  Please install opencode manually: https://opencode.ai")
+				}
+			}
+		case "gemini":
+			if !installer.IsCommandInstalled("gemini") {
+				fmt.Println("gemini not found, starting automatic installation...")
+				if err := installer.Install(); err != nil {
+					fmt.Printf("⚠️  Warning: %v\n", err)
+					fmt.Println("⚠️  Please install gemini manually")
+				}
+			}
+		default:
+			// Try default installation: claude -> opencode -> gemini
+			if _, err := exec.LookPath(codeCmd); err != nil {
+				fmt.Printf("%s not found, trying default installation...\n", codeCmd)
+				if err := installer.InstallDefault(); err != nil {
+					fmt.Printf("⚠️  Warning: %v\n", err)
+				}
 			}
 		}
 	}
@@ -123,20 +166,34 @@ func runServe(session, password, authName, codeCmd, remote, flags string, envVar
 		remote = "https://clauded.friddle.me"
 	}
 
+	// Setup notification hooks for AI tools
+	if enableNotify {
+		if err := src.SetupClaudeCodeHooks(codeCmd); err != nil {
+			fmt.Printf("⚠️  Warning: failed to setup notification hooks: %v\n", err)
+		}
+	}
+
 	// Create configuration
 	config := &src.Config{
-		Remote:             remote,
 		Session:            session,
-		Password:           password,
 		AuthName:           authName,
+		Password:           pass,
+		Remote:             remote,
 		CodeCmd:            codeCmd,
 		Flags:              flags,
 		EnvVars:            envVars,
-		AttachPorts:        attachPorts,
+		Terminal:           terminal,
+		Tmux:               tmux,
+		Auth:               auth,
 		AutoExit:           autoExit,
+		EnableNotify:       enableNotify,
+		NotifyWebhook:      notifyWebhook,
+		StaticIndex:        staticIndex,
+		AttachPort:         attachPort,
 		InsecureSkipVerify: insecureSkipVerify,
 		Daemon:             daemon,
 		SkipInstall:        skipInstall,
+		PidFile:            pidFile,
 	}
 
 	// Validate configuration

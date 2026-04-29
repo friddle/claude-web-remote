@@ -10,7 +10,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 )
 
-replace github.com/sorenisanerd/gotty => ./gotty
+replace github.com/sorenisanerd/gotty => ../../gotty-piko/upstream/gotty
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
